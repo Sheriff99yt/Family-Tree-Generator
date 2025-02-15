@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Family Tree Network</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        #network {
+            width: 100%;
+            height: 800px;
+            border: 1px solid #ccc;
+        }
+        textarea { width: 100%; height: 200px; }
+    </style>
+</head>
+<body>
+    <textarea id="input" placeholder="Enter family data here..."></textarea><br>
+    <button onclick="generateTree()">Generate Tree</button>
+    <button onclick="clearAll()">Clear</button>
+    <div id="network"></div>
+
+    <script>
+        function clearAll() {
+            document.getElementById('input').value = '';
+            document.getElementById('network').innerHTML = '';
+        }
+
+        function generateTree() {
+            const input = document.getElementById('input').value.trim();
+            const people = new Map();
+            const spouseRelations = new Set();
+
+            // Parsing logic
+            input.split('\n').forEach(line => {
+                line = line.trim();
+                if (!line) return;
+
+                if (line.includes('+')) {
+                    const [left, right] = line.split('+').map(s => s.trim());
+                    processSpouses(people, spouseRelations, left, right);
+                } else {
+                    processChild(people, line);
+                }
+            });
+
+            // Add children to spouses
+            people.forEach(person => {
+                person.children.forEach(child => {
+                    person.spouses.forEach(spouse => {
+                        const spouseNode = people.get(spouse);
+                        if (spouseNode && !spouseNode.children.includes(child)) {
+                            spouseNode.children.push(child);
+                        }
+                    });
+                });
+            });
+
+            // Create vis-network nodes and edges
+            const nodes = new vis.DataSet([]);
+            const edges = new vis.DataSet([]);
+            const surnameColors = {};
+            let colorIndex = 0;
+            const colors = [  // More distinct and visually appealing colors
+                '#a7c4ff', '#96d9c1', '#fdd998', '#ffb3ba',  // Lighter shades
+                '#ffdfba', '#baffc9', '#bae1ff', '#f0baff',
+                '#99c2a2', '#f6bd60', '#e07a5f', '#8ac926' // More saturated shades
+            ];
+
+            people.forEach((person, name) => {
+                const surname = getSurname(name);
+                if (!surnameColors[surname]) {
+                    surnameColors[surname] = colors[colorIndex % colors.length];
+                    colorIndex++;
+                }
+
+                nodes.add({
+                    id: name,
+                    label: name,
+                    group: surname,
+                    title: `Family: ${surname}\nSpouses: ${Array.from(person.spouses).join(', ')}`,
+                    font: { size: 14 },
+                    shape: 'box',  // Explicitly set shape here
+                    color: {  // Add color here for individual node override
+                        background: surnameColors[surname],
+                        border: '#2B2B2B',
+                        highlight: { background: surnameColors[surname] }
+                    }
+                });
+
+                // Add parent-child edges
+                person.children.forEach(child => {
+                    edges.add({
+                        from: name,
+                        to: child,
+                        arrows: 'to',
+                        color: { color: '#2B7CE9' },
+                        dashes: false,
+                        length: 200 // Added length
+                    });
+                });
+
+                // Add spouse edges
+                person.spouses.forEach(spouse => {
+                    if (name < spouse) { // Avoid duplicate edges
+                        edges.add({
+                            from: name,
+                            to: spouse,
+                            color: { color: '#FF0000' },
+                            dashes: true,
+                            width: 2,
+                            physics: false,
+                            length: 100 // Added length, shorter than child links
+                        });
+                    }
+                });
+            });
+
+            // Configure network
+            const container = document.getElementById('network');
+            const data = {
+                nodes: nodes,
+                edges: edges
+            };
+
+            const options = {
+                nodes: {
+                  // shape and margin are already defined in individual node options
+                    widthConstraint: {
+                        maximum: 200
+                    }
+                },
+                edges: {
+                    smooth: {
+                        type: 'cubicBezier',
+                        forceDirection: 'vertical',
+                        roundness: 0.4 // added roundness
+                    }
+                },
+                groups: Object.keys(surnameColors).reduce((acc, surname) => {
+                    acc[surname] = {
+                        color: {  // Group color definition (though overridden by individual node)
+                            background: surnameColors[surname],
+                            border: '#2B2B2B',
+                            highlight: { background: surnameColors[surname] }
+                        }
+
+                    };
+                    return acc;
+                }, {}),
+                layout: {
+                    hierarchical: {
+                        direction: 'UD',
+                        sortMethod: 'directed',
+                        nodeSpacing: 150,
+                        levelSeparation: 200,
+                        treeSpacing: 250  // Added treeSpacing
+                    }
+                },
+                physics: {
+                    hierarchicalRepulsion: {  // Modified physics
+                        nodeDistance: 220, // Increased distance
+                        springLength: 250,
+                        springConstant: 0.01,
+                        damping: 0.09
+                    },
+                    // minVelocity: 0.75 // You can uncomment this if you find the simulation too active
+                },
+                interaction: { // Added interaction options
+                    navigationButtons: true,
+                    keyboard: true
+                }
+            };
+
+            new vis.Network(container, data, options);
+        }
+
+
+        // Helper functions
+        function processSpouses(people, spouseRelations, left, right) {
+            addPersonWithAncestry(people, left);
+            addPersonWithAncestry(people, right);
+
+            const key = [left, right].sort().join('+');
+            if (!spouseRelations.has(key)) {
+                people.get(left).spouses.add(right);
+                people.get(right).spouses.add(left);
+                spouseRelations.add(key);
+            }
+        }
+
+        function processChild(people, child) {
+            addPersonWithAncestry(people, child);
+            let parent = findExistingParent(people, child);
+            if (parent) linkParentChild(people, parent, child);
+        }
+
+        function addPersonWithAncestry(people, name) {
+            if (!people.has(name)) {
+                people.set(name, createPerson(name));
+                buildAncestryChain(people, name);
+            }
+        }
+
+        function buildAncestryChain(people, name) {
+            let current = name;
+            while (true) {
+                const parentName = extractParentName(current);
+                if (!parentName) break;
+                if (!people.has(parentName)) people.set(parentName, createPerson(parentName));
+                linkParentChild(people, parentName, current);
+                current = parentName;
+            }
+        }
+
+        function createPerson(name) {
+            return {
+                name: name,
+                parent: null,
+                spouses: new Set(),
+                children: [],
+                processed: false
+            };
+        }
+
+        function linkParentChild(people, parent, child) {
+            if (!people.get(parent).children.includes(child)) {
+                people.get(parent).children.push(child);
+            }
+            people.get(child).parent = parent;
+        }
+
+        function extractParentName(name) {
+            return name.split(' ').slice(1).join(' ') || null;
+        }
+
+        function findExistingParent(people, child) {
+            let current = child;
+            while (current) {
+                const parent = people.get(current)?.parent;
+                if (parent && people.has(parent)) return parent;
+                current = parent;
+            }
+            return null;
+        }
+
+        function getSurname(name) {
+            return name.split(' ').pop();
+        }
+    </script>
+</body>
+</html>

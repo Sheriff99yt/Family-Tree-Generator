@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Family Tree Generator</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        /* Basic styling for UI elements */
+        textarea { 
+            width: 100%; 
+            height: 100%; 
+            font-family: monospace;
+        }
+        pre { 
+            white-space: pre-wrap; 
+            background: #f0f0f0; 
+            padding: 10px;
+            font-family: monospace;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        /* Dark mode styles */
+        body.dark-mode {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        body.dark-mode textarea {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            border: 1px solid #333;
+        }
+        body.dark-mode pre {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            border: 1px solid #333;
+        }
+        body.dark-mode button {
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #444;
+        }
+
+        /* New flex container for input/output */
+        .flex-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        .input-section, .output-section {
+            width: 48%;
+        }
+
+        /* Modern UI Styles */
+        :root {
+            --primary-bg: #ffffff;
+            --primary-color: #333333;
+            --secondary-bg: #f0f0f0;
+            --secondary-color: #555555;
+            --accent-color: #0078d4;
+            --transition-speed: 0.1s;
+            --font-family: 'Roboto', sans-serif;
+        }
+        body {
+            font-family: var(--font-family);
+            background-color: var(--primary-bg);
+            color: var(--primary-color);
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+        }
+        textarea, pre {
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all var(--transition-speed);
+        }
+        textarea {
+            background-color: var(--secondary-bg);
+            padding: 10px;
+            border: 1px solid var(--secondary-color);
+        }
+        pre {
+            background-color: var(--secondary-bg);
+            padding: 10px;
+            border: 1px solid var(--secondary-color);
+        }
+        button {
+            border: none;
+            border-radius: 4px;
+            background-color: var(--accent-color);
+            color: #fff;
+            transition: background-color var(--transition-speed), box-shadow var(--transition-speed);
+        }
+        button:hover {
+            background-color: #005a9e;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Dark mode using CSS variables */
+        body.dark-mode {
+            --primary-bg: #121212;
+            --primary-color: #e0e0e0;
+            --secondary-bg: #1e1e1e;
+            --secondary-color: #555;
+            --accent-color: #005a9e;
+        }
+        
+        /* Flex container remains */
+        .flex-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        .input-section, .output-section {
+            width: 48%;
+        }
+
+        /* New styling for full-height input */
+        .input-section {
+            width: 48%;
+            height: calc(100vh - 60px);  /* assuming 60px for button-group height */
+        }
+        
+        textarea {
+            height: 100%;
+            /* ...existing textarea properties... */
+        }
+
+        /* Network Styles */
+        .network {
+            width: 100%;
+            height: 800px;
+            border: 1px solid #ccc;
+            margin-top: 20px;
+        }
+        .controls {
+            margin: 10px 0;
+        }
+
+    </style>
+    <!-- Optionally include Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body class="dark-mode">
+    <!-- UI Elements -->
+    <div class="button-group">
+        <button onclick="generateTree()">Generate Tree</button>
+        <button onclick="clearAll()">Clear</button>
+        <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    </div>
+    <div class="flex-container">
+        <div class="input-section">
+            <textarea id="input" placeholder="Enter family data here..."></textarea>
+        </div>
+        <div class="output-section">
+            <div id="networkContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        let networks = [];
+        const colorPalette = [
+            '#F5F5F5', '#D4E6F1', '#FADBD8', '#D1F2EB', 
+            '#E8DAEF', '#FDEBD0', '#D5DBDB', '#F6DDCC'
+        ];
+
+        // MAIN FUNCTIONS ======================================================
+
+        /**
+         * Clears all input and output fields
+         */
+        function clearAll() {
+            document.getElementById('input').value = '';
+            document.getElementById('networkContainer').innerHTML = '';
+            networks = [];
+        }
+
+        /**
+         * Main generator function that coordinates the tree creation process
+         */
+        function generateTree() {
+            const input = document.getElementById('input').value.trim();
+            const people = new Map();       // Stores all family members
+            const spouseRelations = new Set();  // Tracks unique spouse pairs
+
+            // PHASE 1: INPUT PROCESSING ---------------------------------------
+            input.split('\n').forEach(line => {
+                line = line.trim();
+                if (!line) return;
+
+                if (line.includes('+')) {
+                    // Process spouse relationships
+                    const [left, right] = line.split('+').map(s => s.trim());
+                    processSpouses(people, spouseRelations, left, right);
+                } else {
+                    // Process child entries
+                    processChild(people, line);
+                }
+            });
+
+            // PHASE 2: POST-PROCESSING ---------------------------------------
+            // Add children to all spouses to show in both family trees
+            people.forEach(person => {
+                person.children.forEach(child => {
+                    person.spouses.forEach(spouse => {
+                        const spouseNode = people.get(spouse);
+                        if (spouseNode && !spouseNode.children.includes(child)) {
+                            spouseNode.children.push(child);
+                        }
+                    });
+                });
+            });
+
+            // Split into family groups
+            const roots = Array.from(people.values()).filter(p => !p.parent);
+            roots.forEach(root => {
+                const familyGroup = collectFamilyGroup(root.name, people);
+                createFamilyNetwork(familyGroup, people);
+            });
+        }
+
+        function collectFamilyGroup(rootName, people) {
+            const group = new Set();
+            const queue = [rootName];
+            
+            while (queue.length > 0) {
+                const currentName = queue.shift();
+                if (group.has(currentName)) continue;
+                group.add(currentName);
+                const person = people.get(currentName);
+                
+                person.spouses.forEach(spouse => {
+                    if (!group.has(spouse)) queue.push(spouse);
+                });
+                
+                person.children.forEach(child => {
+                    if (!group.has(child)) queue.push(child);
+                });
+            }
+            return group;
+        }
+
+        function createFamilyNetwork(familyGroup, allPeople) {
+            const nodes = [];
+            const edges = [];
+            const edgeIds = new Set();
+            const surnameColors = new Map();
+
+            // Generate colors for this family group
+            familyGroup.forEach(name => {
+                const surname = getSurname(name);
+                if (!surnameColors.has(surname)) {
+                    const color = colorPalette[surnameColors.size % colorPalette.length];
+                    surnameColors.set(surname, color);
+                }
+            });
+
+            familyGroup.forEach(name => {
+                const person = allPeople.get(name);
+                const surname = getSurname(name);
+                
+                nodes.push({
+                    id: name,
+                    label: name,
+                    group: surname,
+                    title: generateTooltipContent(person),
+                    color: {
+                        background: surnameColors.get(surname),
+                        border: '#2B2B2B',
+                        highlight: {
+                            background: adjustColor(surnameColors.get(surname), 30),
+                            border: '#2B2B2B'
+                        }
+                    }
+                });
+
+                // Parent-child relationships
+                if (person.parent && familyGroup.has(person.parent)) {
+                    const edgeId = `${person.parent}->${name}`;
+                    if (!edgeIds.has(edgeId)) {
+                        edges.push({
+                            from: person.parent,
+                            to: name,
+                            arrows: 'to',
+                            color: { color: '#2B7CE9' },
+                            width: 2,
+                            smooth: { type: 'cubicBezier' }
+                        });
+                        edgeIds.add(edgeId);
+                    }
+                }
+
+                // Spouse relationships
+                person.spouses.forEach(spouse => {
+                    if (familyGroup.has(spouse)) {
+                        const sortedPair = [name, spouse].sort();
+                        const edgeId = `${sortedPair[0]}++${sortedPair[1]}`;
+                        
+                        if (!edgeIds.has(edgeId)) {
+                            edges.push({
+                                from: sortedPair[0],
+                                to: sortedPair[1],
+                                dashes: [5,5],
+                                color: { color: '#FF9742' },
+                                width: 2,
+                                smooth: { type: 'cubicBezier' }
+                            });
+                            edgeIds.add(edgeId);
+                        }
+                    }
+                });
+            });
+
+            // Create container
+            const container = document.createElement('div');
+            container.className = 'network';
+            document.getElementById('networkContainer').appendChild(container);
+
+            // Create network
+            const data = {
+                nodes: new vis.DataSet(nodes),
+                edges: new vis.DataSet(edges)
+            };
+
+            const options = {
+                nodes: {
+                    shape: 'box',
+                    margin: 10,
+                    font: { size: 14, face: 'Arial', color: '#333333' },
+                    borderWidth: 1,
+                    shadow: true
+                },
+                edges: {
+                    smooth: { type: 'cubicBezier', forceDirection: 'vertical' }
+                },
+                layout: {
+                    hierarchical: {
+                        enabled: true,
+                        direction: 'UD',
+                        nodeSpacing: 150,
+                        levelSeparation: 200,
+                        sortMethod: 'directed'
+                    }
+                },
+                physics: false,
+                groups: Object.fromEntries(
+                    Array.from(surnameColors).map(([surname, color]) => [
+                        surname, 
+                        { color: { background: color } }
+                    ])
+                )
+            };
+
+            const network = new vis.Network(container, data, options);
+            networks.push(network);
+        }
+
+        // DATA PROCESSING FUNCTIONS ===========================================
+
+        /**
+         * Processes spouse relationships between two individuals
+         * @param {Map} people - Map of all family members
+         * @param {Set} spouseRelations - Set of unique spouse pairs
+         * @param {string} left - First spouse name
+         * @param {string} right - Second spouse name
+         */
+        function processSpouses(people, spouseRelations, left, right) {
+            addPersonWithAncestry(people, left);
+            addPersonWithAncestry(people, right);
+            
+            // Create bidirectional spouse relationship
+            const key = [left, right].sort().join('+');
+            if (!spouseRelations.has(key)) {
+                people.get(left).spouses.add(right);
+                people.get(right).spouses.add(left);
+                spouseRelations.add(key);
+            }
+        }
+
+        /**
+         * Processes a child entry and links to parent
+         * @param {Map} people - Map of all family members
+         * @param {string} child - Child's full name
+         */
+        function processChild(people, child) {
+            addPersonWithAncestry(people, child);
+            const parent = findExistingParent(people, child);
+            if (parent) linkParentChild(people, parent, child);
+        }
+
+        // ANCESTRY MANAGEMENT FUNCTIONS =======================================
+
+        /**
+         * Adds a person and their complete ancestry to the Map
+         * @param {Map} people - Map of all family members
+         * @param {string} name - Full name of person to add
+         */
+        function addPersonWithAncestry(people, name) {
+            if (!people.has(name)) {
+                people.set(name, createPerson(name));
+                buildAncestryChain(people, name);
+            }
+        }
+
+        /**
+         * Builds implicit ancestor chain for a name
+         * Example: "A B C" creates C → B C → A B C
+         * @param {Map} people - Map of all family members
+         * @param {string} name - Starting name for ancestry chain
+         */
+        function buildAncestryChain(people, name) {
+            let current = name;
+            while (true) {
+                const parentName = extractParentName(current);
+                if (!parentName) break;
+                
+                if (!people.has(parentName)) {
+                    people.set(parentName, createPerson(parentName));
+                }
+                
+                linkParentChild(people, parentName, current);
+                current = parentName;
+            }
+        }
+
+        // UTILITY FUNCTIONS ==================================================
+
+        /**
+         * Creates a new person object
+         * @param {string} name - Full name of the person
+         * @returns {object} New person object
+         */
+        function createPerson(name) {
+            return {
+                name: name,
+                parent: null,
+                spouses: new Set(),
+                children: [],
+                processed: false
+            };
+        }
+
+        /**
+         * Establishes parent-child relationship between two nodes
+         * @param {Map} people - Map of all family members
+         * @param {string} parent - Parent's full name
+         * @param {string} child - Child's full name
+         */
+        function linkParentChild(people, parent, child) {
+            if (!people.get(parent).children.includes(child)) {
+                people.get(parent).children.push(child);
+            }
+            people.get(child).parent = parent;
+        }
+
+        /**
+         * Extracts parent name from a child name
+         * @param {string} name - Child's full name
+         * @returns {string|null} Parent name or null
+         */
+        function extractParentName(name) {
+            return name.split(' ').slice(1).join(' ') || null;
+        }
+
+        /**
+         * Finds existing parent in the hierarchy
+         * @param {Map} people - Map of all family members
+         * @param {string} child - Child's full name
+         * @returns {string|null} Parent name if exists
+         */
+        function findExistingParent(people, child) {
+            let current = child;
+            while (current) {
+                const parent = people.get(current)?.parent;
+                if (parent && people.has(parent)) return parent;
+                current = parent;
+            }
+            return null;
+        }
+
+        /**
+         * Extracts surname from full name
+         * @param {string} name - Full name
+         * @returns {string} Last name component
+         */
+        function getSurname(name) {
+            return name.split(' ').pop();
+        }
+
+        function adjustColor(hex, percent) {
+            hex = hex.replace(/^\s*#|\s*$/g, '');
+        
+            if (hex.length == 3) {
+                hex = hex.replace(/(.)/g, '$1$1');
+            }
+        
+            const r = parseInt(hex.substr(0, 2), 16),
+                g = parseInt(hex.substr(2, 2), 16),
+                b = parseInt(hex.substr(4, 2), 16);
+        
+            const calculatedPercent = (percent / 100);
+        
+            const rNew = Math.round(Math.min(255, Math.max(0, r + (r * calculatedPercent)))).toString(16);
+            const gNew = Math.round(Math.min(255, Math.max(0, g + (g * calculatedPercent)))).toString(16);
+            const bNew = Math.round(Math.min(255, Math.max(0, b + (b * calculatedPercent)))).toString(16);
+        
+            const newHex = "#" +
+                (rNew.length < 2 ? "0" + rNew : rNew) +
+                (gNew.length < 2 ? "0" + gNew : gNew) +
+                (bNew.length < 2 ? "0" + bNew : bNew);
+        
+            return newHex;
+        }
+
+        function generateTooltipContent(person) {
+            let content = `<b>${person.name}</b><br>`;
+            if (person.parent) {
+                content += `Parent: ${person.parent}<br>`;
+            }
+            if (person.spouses.size > 0) {
+                content += `Spouses: ${Array.from(person.spouses).join(', ')}<br>`;
+            }
+            if (person.children.length > 0) {
+                content += `Children: ${person.children.join(', ')}<br>`;
+            }
+            return content;
+        }
+
+        // DARK MODE TOGGLE FUNCTION ============================================
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+        }
+    </script>
+</body>
+</html>
