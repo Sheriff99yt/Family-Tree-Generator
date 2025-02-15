@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Family Tree Generator</title>
+    <style>
+        /* Basic styling for UI elements */
+        textarea { 
+            width: 800px; 
+            height: 300px; 
+            font-family: monospace;
+        }
+        pre { 
+            white-space: pre-wrap; 
+            background: #f0f0f0; 
+            padding: 10px;
+            font-family: monospace;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- UI Elements -->
+    <textarea id="input" placeholder="Enter family data here..."></textarea><br>
+    <button onclick="generateTree()">Generate Tree</button>
+    <button onclick="clearAll()">Clear</button>
+    <pre id="output"></pre>
+
+    <script>
+        // MAIN FUNCTIONS ======================================================
+
+        /**
+         * Clears all input and output fields
+         */
+        function clearAll() {
+            document.getElementById('input').value = '';
+            document.getElementById('output').textContent = '';
+        }
+
+        /**
+         * Main generator function that coordinates the tree creation process
+         */
+        function generateTree() {
+            const input = document.getElementById('input').value.trim();
+            const people = new Map();       // Stores all family members
+            const spouseRelations = new Set();  // Tracks unique spouse pairs
+
+            // PHASE 1: INPUT PROCESSING ---------------------------------------
+            input.split('\n').forEach(line => {
+                line = line.trim();
+                if (!line) return;
+
+                if (line.includes('+')) {
+                    // Process spouse relationships
+                    const [left, right] = line.split('+').map(s => s.trim());
+                    processSpouses(people, spouseRelations, left, right);
+                } else {
+                    // Process child entries
+                    processChild(people, line);
+                }
+            });
+
+            // PHASE 2: POST-PROCESSING ---------------------------------------
+            // Add children to all spouses to show in both family trees
+            people.forEach(person => {
+                person.children.forEach(child => {
+                    person.spouses.forEach(spouse => {
+                        const spouseNode = people.get(spouse);
+                        if (spouseNode && !spouseNode.children.includes(child)) {
+                            spouseNode.children.push(child);
+                        }
+                    });
+                });
+            });
+
+            // PHASE 3: TREE GENERATION ----------------------------------------
+            const roots = getFamilyRoots(people);
+            const output = [];
+            
+            roots.forEach(surname => {
+                const tree = buildSurnameTree(people, surname);
+                if (tree.length > 0) {
+                    output.push(`Family Tree: ${surname}\n${tree.join('\n')}`);
+                }
+            });
+
+            document.getElementById('output').textContent = output.join('\n\n');
+        }
+
+        // DATA PROCESSING FUNCTIONS ===========================================
+
+        /**
+         * Processes spouse relationships between two individuals
+         * @param {Map} people - Map of all family members
+         * @param {Set} spouseRelations - Set of unique spouse pairs
+         * @param {string} left - First spouse name
+         * @param {string} right - Second spouse name
+         */
+        function processSpouses(people, spouseRelations, left, right) {
+            addPersonWithAncestry(people, left);
+            addPersonWithAncestry(people, right);
+            
+            // Create bidirectional spouse relationship
+            const key = [left, right].sort().join('+');
+            if (!spouseRelations.has(key)) {
+                people.get(left).spouses.add(right);
+                people.get(right).spouses.add(left);
+                spouseRelations.add(key);
+            }
+        }
+
+        /**
+         * Processes a child entry and links to parent
+         * @param {Map} people - Map of all family members
+         * @param {string} child - Child's full name
+         */
+        function processChild(people, child) {
+            addPersonWithAncestry(people, child);
+            const parent = findExistingParent(people, child);
+            if (parent) linkParentChild(people, parent, child);
+        }
+
+        // ANCESTRY MANAGEMENT FUNCTIONS =======================================
+
+        /**
+         * Adds a person and their complete ancestry to the Map
+         * @param {Map} people - Map of all family members
+         * @param {string} name - Full name of person to add
+         */
+        function addPersonWithAncestry(people, name) {
+            if (!people.has(name)) {
+                people.set(name, createPerson(name));
+                buildAncestryChain(people, name);
+            }
+        }
+
+        /**
+         * Builds implicit ancestor chain for a name
+         * Example: "A B C" creates C → B C → A B C
+         * @param {Map} people - Map of all family members
+         * @param {string} name - Starting name for ancestry chain
+         */
+        function buildAncestryChain(people, name) {
+            let current = name;
+            while (true) {
+                const parentName = extractParentName(current);
+                if (!parentName) break;
+                
+                if (!people.has(parentName)) {
+                    people.set(parentName, createPerson(parentName));
+                }
+                
+                linkParentChild(people, parentName, current);
+                current = parentName;
+            }
+        }
+
+        // UTILITY FUNCTIONS ==================================================
+
+        /**
+         * Creates a new person object
+         * @param {string} name - Full name of the person
+         * @returns {object} New person object
+         */
+        function createPerson(name) {
+            return {
+                name: name,
+                parent: null,
+                spouses: new Set(),
+                children: [],
+                processed: false
+            };
+        }
+
+        /**
+         * Establishes parent-child relationship between two nodes
+         * @param {Map} people - Map of all family members
+         * @param {string} parent - Parent's full name
+         * @param {string} child - Child's full name
+         */
+        function linkParentChild(people, parent, child) {
+            if (!people.get(parent).children.includes(child)) {
+                people.get(parent).children.push(child);
+            }
+            people.get(child).parent = parent;
+        }
+
+        /**
+         * Extracts parent name from a child name
+         * @param {string} name - Child's full name
+         * @returns {string|null} Parent name or null
+         */
+        function extractParentName(name) {
+            return name.split(' ').slice(1).join(' ') || null;
+        }
+
+        /**
+         * Finds existing parent in the hierarchy
+         * @param {Map} people - Map of all family members
+         * @param {string} child - Child's full name
+         * @returns {string|null} Parent name if exists
+         */
+        function findExistingParent(people, child) {
+            let current = child;
+            while (current) {
+                const parent = people.get(current)?.parent;
+                if (parent && people.has(parent)) return parent;
+                current = parent;
+            }
+            return null;
+        }
+
+        // TREE BUILDING FUNCTIONS =============================================
+
+        /**
+         * Gets unique family surnames from root nodes
+         * @param {Map} people - Map of all family members
+         * @returns {string[]} Array of unique surnames
+         */
+        function getFamilyRoots(people) {
+            const surnames = new Set();
+            for (const [name, person] of people) {
+                if (!person.parent) {
+                    surnames.add(getSurname(name));
+                }
+            }
+            return Array.from(surnames);
+        }
+
+        /**
+         * Extracts surname from full name
+         * @param {string} name - Full name
+         * @returns {string} Last name component
+         */
+        function getSurname(name) {
+            return name.split(' ').pop();
+        }
+
+        /**
+         * Builds the complete tree for a surname
+         * @param {Map} people - Map of all family members
+         * @param {string} surname - Family surname to build
+         * @returns {string[]} Array of formatted tree lines
+         */
+        function buildSurnameTree(people, surname) {
+            const roots = Array.from(people.values())
+                .filter(p => !p.parent && getSurname(p.name) === surname)
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+            const output = [];
+            const visited = new Set();
+
+            roots.forEach(root => {
+                const treeLines = [];
+                buildTreeLines(root.name, 0, [], true, treeLines, visited, people, surname);
+                output.push(...treeLines);
+            });
+
+            return output;
+        }
+
+        /**
+         * Recursively builds tree lines with proper formatting
+         * @param {string} name - Current node name
+         * @param {number} depth - Current depth in tree
+         * @param {string[]} prefixes - Line prefix components
+         * @param {boolean} isLast - If node is last child
+         * @param {string[]} output - Accumulated output lines
+         * @param {Set} visited - Track visited nodes
+         * @param {Map} people - Map of all family members
+         * @param {string} surname - Current family surname
+         */
+        function buildTreeLines(name, depth, prefixes, isLast, output, visited, people, surname) {
+            if (visited.has(name)) return;
+            visited.add(name);
+
+            const person = people.get(name);
+            const spouses = Array.from(person.spouses).sort();
+
+            // Build node line with context-aware spouses
+            const nodeParts = [name];
+            spouses.forEach(spouse => {
+                if (getSurname(spouse) === surname || getSurname(name) === surname) {
+                    nodeParts.push(spouse);
+                }
+            });
+
+            // Format connectors and indentation
+            const connector = depth === 0 ? '' : (isLast ? '└── ' : '├── ');
+            const line = depth === 0 
+                ? nodeParts.join(', ')
+                : prefixes.slice(0, -1).join('') + connector + nodeParts.join(', ');
+
+            output.push(line);
+
+            // Process children recursively
+            const children = [...person.children].sort();
+            children.forEach((child, index) => {
+                const newPrefixes = [...prefixes];
+                newPrefixes.push(index === children.length - 1 ? '    ' : '│   ');
+                
+                buildTreeLines(child, depth + 1, newPrefixes, 
+                             index === children.length - 1, 
+                             output, visited, people, surname);
+            });
+        }
+    </script>
+</body>
+</html>
