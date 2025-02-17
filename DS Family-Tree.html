@@ -1,69 +1,312 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Family Tree Network</title>
-    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <title>Family Tree Generator</title>
     <style>
-        html, body {
+        /* General Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
-            padding: 0;
-            height: 100%;
+            overflow: hidden; /* Prevent scrollbars */
+            background-color: #f4f4f4;
+            color: #333;
+            transition: background-color 0.3s, color 0.3s; /* Dark mode transition */
         }
-        #network {
-            width: 100%;
-            height: 100%;
-            border: 1px solid #ccc;
+
+        body.dark-mode {
+            background-color: #333;
+            color: #f4f4f4;
         }
-        #sidebar {
+
+        /* Sidebar Styles */
+        .sidebar {
+            height: 100%;
+            width: 300px;
             position: fixed;
             top: 0;
             left: 0;
-            width: 300px;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.9);
-            overflow-y: auto;
-            z-index: 10;
-            padding: 10px;
+            background-color: #fff;
+            overflow-x: hidden;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease-in-out;
+            z-index: 2;
         }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .sidebar-header h2 {
+            margin: 0;
+        }
+
+        .sidebar.dark-mode {
+            background-color: #444;
+            box-shadow: 2px 0 5px rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-300px);
+        }
+
+        .sidebar-toggle {
+            position: static;  /* Changed from absolute */
+            background-color: #312b86;
+            color: white;
+            border: none;
+            transition: background-color 0.3s;
+        }
+
+        .sidebar-toggle:hover {
+            background-color: #564afa;
+        }
+
+        .sidebar-toggle.dark-mode {
+            background-color: #555;
+            color: #fff;
+        }
+
+        .sidebar-toggle.dark-mode:hover {
+            background-color: #666;
+        }
+
+        /* Right Sidebar Styles */
+        .right-sidebar {
+            height: 100%;
+            width: 70px;  /* Changed from 100px */
+            position: fixed;
+            top: 0;
+            right: 0;
+            background-color: #fff;
+            overflow-x: hidden;
+            padding: 20px;
+            box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease-in-out;
+            z-index: 2;
+        }
+
+        .right-sidebar.dark-mode {
+            background-color: #444;
+            box-shadow: -2px 0 5px rgba(255, 255, 255, 0.1);
+        }
+
+        /* Textarea Styles */
         textarea {
             width: 100%;
             height: 200px;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+            transition: border-color 0.3s, background-color 0.3s, color 0.3s;
+            overflow: hidden;  /* Added to hide scrollbar */
+        }
+
+        textarea.dark-mode {
+            background-color: #555;
+            color: #fff;
+            border-color: #666;
+        }
+
+        /* Button Styles */
+        button {
+            background-color: #312b86;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #564afa;
+        }
+
+        button.dark-mode {
+            background-color: #555;
+            color: #fff;
+        }
+
+        button.dark-mode:hover {
+            background-color: #666;
+        }
+
+        /* Network Container Styles */
+        #network {
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Dark Mode Switch */
+        .dark-mode-switch {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .dark-mode-switch label {
+            margin-left: 10px;
+            font-size: 16px;
+        }
+
+        /* Toggle Switch Styles */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px #2196F3;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
         }
     </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet" type="text/css" />
 </head>
-<body>
-    <div id="network"></div>
-    <div id="sidebar">
-        <textarea id="input"></textarea><br>
+<body class="dark-mode">  <!-- Added dark-mode class -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>Family Tree Input</h2>
+            <button class="sidebar-toggle">☰</button>
+        </div>
+        <textarea id="input" placeholder="Enter family data here..."></textarea><br>
         <button onclick="generateTree()">Generate Tree</button>
         <button onclick="clearAll()">Clear</button>
     </div>
 
+    <div class="right-sidebar dark-mode">  <!-- Added dark-mode class -->
+        <div class="dark-mode-switch">
+            <label class="switch">
+                <input type="checkbox" id="darkModeToggle" checked>  <!-- Added checked attribute -->
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div id="network"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
     <script>
+        let network = null;
+        let isDarkMode = true;  // Changed initial state to true
+
+        // Sidebar Toggle
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarToggle = document.querySelector('.sidebar-toggle');
+        let isSidebarCollapsed = false;
+
+        sidebarToggle.addEventListener('click', () => {
+            isSidebarCollapsed = !isSidebarCollapsed;
+            sidebar.classList.toggle('collapsed', isSidebarCollapsed);
+        });
+
+        // Dark Mode Toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const body = document.body;
+        const textarea = document.getElementById('input');
+        const buttons = document.querySelectorAll('button');
+        const rightSidebar = document.querySelector('.right-sidebar');
+
+        darkModeToggle.addEventListener('change', () => {
+            isDarkMode = darkModeToggle.checked;
+            body.classList.toggle('dark-mode', isDarkMode);
+            sidebar.classList.toggle('dark-mode', isDarkMode);
+            rightSidebar.classList.toggle('dark-mode', isDarkMode);
+            textarea.classList.toggle('dark-mode', isDarkMode);
+            buttons.forEach(button => button.classList.toggle('dark-mode', isDarkMode));
+            sidebarToggle.classList.toggle('dark-mode', isDarkMode);
+        });
+
+        // Initial dark mode setup
+        window.addEventListener('load', () => {
+            // Add dark mode classes to elements
+            sidebar.classList.add('dark-mode');
+            rightSidebar.classList.add('dark-mode');
+            textarea.classList.add('dark-mode');
+            buttons.forEach(button => button.classList.add('dark-mode'));
+            sidebarToggle.classList.add('dark-mode');
+        });
+
         function clearAll() {
             document.getElementById('input').value = '';
-            document.getElementById('network').innerHTML = '';
+            if (network) network.destroy();
         }
 
         function generateTree() {
             const input = document.getElementById('input').value.trim();
             const people = new Map();
             const spouseRelations = new Set();
+            const mothers = new Set(); // To keep track of potential mothers
 
-            // Parse input and build data structure
+            // Process input data
             input.split('\n').forEach(line => {
                 line = line.trim();
                 if (!line) return;
 
                 if (line.includes('+')) {
                     const [left, right] = line.split('+').map(s => s.trim());
-                    processSpouses(people, spouseRelations, left, right);
+                    processSpouses(people, spouseRelations, left, right, mothers); // Pass mothers set
                 } else {
                     processChild(people, line);
                 }
             });
 
-            // Post-process children for spouses
+            // Add children to all spouses
             people.forEach(person => {
                 person.children.forEach(child => {
                     person.spouses.forEach(spouse => {
@@ -75,127 +318,12 @@
                 });
             });
 
-            // Create vis.js data
-            const nodes = new vis.DataSet();
-            const edges = new vis.DataSet();
-            let nodeIdCounter = 0; // Unique ID for each node
-
-            // Function to add a person to the network
-            function addPersonToNetwork(name, parentId = null, spouseOf = null) {
-                if (!people.has(name)) {
-                    console.warn(`Person ${name} not found in people data. Skipping.`);
-                    return null;
-                }
-
-                const person = people.get(name);
-                let nodeId = `node-${nodeIdCounter++}`;
-
-
-                let level = undefined;
-
-                if(spouseOf) {
-                    level = nodes.get(spouseOf).level;
-                }
-
-
-                nodes.add({
-                    id: nodeId,
-                    label: person.name,
-                    shape: 'box',
-                    title: `Spouses: ${Array.from(person.spouses).join(', ')}`,
-                    level: level
-                });
-
-                // Create edge from parent to child
-                if (parentId) {
-                    edges.add({
-                        from: parentId,
-                        to: nodeId,
-                        arrows: 'to'
-                    });
-                }
-                return nodeId;
-            }
-
-
-            // Find root people (no parent)
-            const roots = Array.from(people.values()).filter(person => person.parent === null);
-
-            // Recursively build the network
-            function buildNetwork(person, parentId = null) {
-                const nodeId = addPersonToNetwork(person.name, parentId);
-
-                if (nodeId) {  // Only proceed if the node was successfully added
-
-                    // Create edges between spouses
-                    person.spouses.forEach(spouseName => {
-                        const spouse = people.get(spouseName);
-                        if (!spouse) {
-                            console.warn(`Spouse ${spouseName} not found. Skipping spouse edge.`);
-                            return;
-                        }
-
-                        const spouseNodeId = addPersonToNetwork(spouse.name, null, nodeId);
-
-                        edges.add({
-                            from: nodeId,
-                            to: spouseNodeId,
-                            dashes: true,
-                            color: 'red'
-                        });
-                    });
-
-                    person.children.slice().reverse().forEach(childName => {
-                            if (people.has(childName)) {
-                                const child = people.get(childName);
-                                buildNetwork(child, nodeId);
-                            } else {
-                                console.warn(`Child ${childName} not found in people data.`);
-                            }
-                        });
-                }
-            }
-
-            roots.forEach(root => buildNetwork(root));
-
-
-            // Initialize vis.js network
-            const container = document.getElementById('network');
-            const data = {
-                nodes: nodes,
-                edges: edges
-            };
-            const options = {
-                layout: {
-                    hierarchical: {
-                        direction: 'UD',
-                        sortMethod: 'hubsize',
-                        nodeSpacing: 150,
-                        levelSeparation: 200
-                    }
-                },
-                physics: {
-                    hierarchicalRepulsion: {
-                        nodeDistance: 150
-                    }
-                },
-                nodes: {
-                    shape: 'box'
-                },
-                edges: {
-                    arrows: {
-                        to: {
-                            enabled: true
-                        }
-                    }
-                }
-            };
-
-            const network = new vis.Network(container, data, options);
+            // Create vis-network data with separate family trees
+            const { nodes, edges } = createFamilyTrees(people, mothers); // Pass mothers set
+            drawNetwork(nodes, edges, mothers); // Pass mothers set to drawNetwork
         }
 
-        // Helper functions from previous implementation
-        function processSpouses(people, spouseRelations, left, right) {
+        function processSpouses(people, spouseRelations, left, right, mothers) {
             addPersonWithAncestry(people, left);
             addPersonWithAncestry(people, right);
 
@@ -204,12 +332,14 @@
                 people.get(left).spouses.add(right);
                 people.get(right).spouses.add(left);
                 spouseRelations.add(key);
+                mothers.add(right); // Assume the second spouse is a potential mother
             }
         }
 
+
         function processChild(people, child) {
             addPersonWithAncestry(people, child);
-            let parent = findExistingParent(people, child);
+            const parent = findExistingParent(people, child);
             if (parent) linkParentChild(people, parent, child);
         }
 
@@ -225,7 +355,11 @@
             while (true) {
                 const parentName = extractParentName(current);
                 if (!parentName) break;
-                if (!people.has(parentName)) people.set(parentName, createPerson(parentName));
+
+                if (!people.has(parentName)) {
+                    people.set(parentName, createPerson(parentName));
+                }
+
                 linkParentChild(people, parentName, current);
                 current = parentName;
             }
@@ -262,8 +396,168 @@
             return null;
         }
 
+        function getFamilyRoots(people) {
+            const surnames = new Set();
+            for (const [name, person] of people) {
+                if (!person.parent) {
+                    surnames.add(getSurname(name));
+                }
+            }
+            return Array.from(surnames);
+        }
+
         function getSurname(name) {
             return name.split(' ').pop();
+        }
+
+        function createFamilyTrees(people, mothers) {
+            const nodes = [];
+            const edges = [];
+            const processedPairs = new Set();
+            const surnames = getFamilyRoots(people);
+
+            surnames.forEach(surname => {
+                const roots = Array.from(people.values())
+                    .filter(p => !p.parent && getSurname(p.name) === surname)
+                    .sort((a, b) => a.name.localeCompare(b.name));
+
+                roots.forEach(root => {
+                    const treeNodes = new Map();
+                    const queue = [{ name: root.name, level: 0, tree: surname }];
+
+                    while (queue.length > 0) {
+                        const current = queue.shift();
+                        const person = people.get(current.name);
+                        const nodeId = `${current.name}@${current.tree}`;
+
+                        if (!treeNodes.has(nodeId)) {
+                            nodes.push({
+                                id: nodeId,
+                                label: current.name,
+                                level: current.level,
+                                group: current.tree,
+                                shape: 'box',
+                                margin: 10,
+                                font: { size: 14 }
+                            });
+                            treeNodes.set(nodeId, true);
+                        }
+
+                        // Add spouses first (before siblings)
+                        Array.from(person.spouses).forEach(spouse => {
+                            const spouseNodeId = `${spouse}@${current.tree}`;
+                            const edgePair = [nodeId, spouseNodeId].sort().join('+');
+
+                            if (!processedPairs.has(edgePair)) {
+                                edges.push({
+                                    from: nodeId,
+                                    to: spouseNodeId,
+                                    color: '#FF0000',
+                                    dashes: true,
+                                    width: 2
+                                });
+                                processedPairs.add(edgePair);
+
+                                // Enqueue spouse immediately after current node
+                                queue.unshift({
+                                    name: spouse,
+                                    level: current.level,
+                                    tree: current.tree
+                                });
+                            }
+                        });
+
+                        // Add children to end of queue
+                        person.children.forEach(child => {
+                            const childNodeId = `${child}@${current.tree}`;
+                            const edgeId = `${nodeId}->${childNodeId}`;
+
+                            if (!processedPairs.has(edgeId)) {
+                                edges.push({
+                                    from: nodeId,
+                                    to: childNodeId,
+                                    arrows: 'to',
+                                    color: '#2B7CE9',
+                                    motherEdge: mothers.has(current.name) // Mark edge if from potential mother
+                                });
+                                processedPairs.add(edgeId);
+
+                                queue.push({
+                                    name: child,
+                                    level: current.level + 1,
+                                    tree: current.tree
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+
+            return { nodes, edges };
+        }
+
+        function drawNetwork(nodes, edges, mothers) {
+            const container = document.getElementById('network');
+            if (network) network.destroy();
+
+            // Filter out edges from mothers to children
+            const filteredEdges = edges.filter(edge => {
+                const fromName = edge.from.split('@')[0]; // Extract name from node ID
+                return !(edge.motherEdge && mothers.has(fromName)); // Remove if motherEdge is true and 'from' is a mother
+            });
+
+
+            const data = {
+                nodes: nodes,
+                edges: filteredEdges // Use filtered edges
+            };
+
+            const options = {
+                layout: {
+                    hierarchical: {
+                        enabled: true,
+                        direction: 'UD',
+                        sortMethod: 'directed',
+                        levelSeparation: 200,
+                        nodeSpacing: 200,
+                        treeSpacing: 200
+                    }
+                },
+                edges: {
+                    smooth: false,
+                    arrows: { to: { scaleFactor: 1 } }
+                },
+                physics: true,
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true
+                },
+                groups: {
+                    useDefaultGroups: false,
+                    groupBy: 'group',
+                    style: function(group) {
+                        return {
+                            border: '2px solid',
+                            borderColor: stringToColor(group),
+                            backgroundColor: stringToColor(group) + '33'
+                        };
+                    }
+                }
+            };
+
+            network = new vis.Network(container, data, options);
+        }
+
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const color = Math.floor(Math.abs(
+                (Math.sin(hash) * 16777215) % 16777215
+            )).toString(16);
+            return '#' + Array(6 - color.length + 1).join('0') + color;
         }
     </script>
 </body>
