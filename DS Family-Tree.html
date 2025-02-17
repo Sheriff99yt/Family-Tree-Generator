@@ -1,22 +1,48 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Family Tree Generator</title>
+    <title>Family Tree Network</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
-        textarea { width: 800px; height: 300px; }
-        pre { white-space: pre-wrap; background: #f0f0f0; padding: 10px; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+        #network {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #ccc;
+        }
+        #sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            overflow-y: auto;
+            z-index: 10;
+            padding: 10px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+        }
     </style>
 </head>
 <body>
-    <textarea id="input" placeholder="Enter family data here..."></textarea><br>
-    <button onclick="generateTree()">Generate Tree</button>
-    <button onclick="clearAll()">Clear</button>
-    <pre id="output"></pre>
+    <div id="network"></div>
+    <div id="sidebar">
+        <textarea id="input"></textarea><br>
+        <button onclick="generateTree()">Generate Tree</button>
+        <button onclick="clearAll()">Clear</button>
+    </div>
 
     <script>
         function clearAll() {
             document.getElementById('input').value = '';
-            document.getElementById('output').textContent = '';
+            document.getElementById('network').innerHTML = '';
         }
 
         function generateTree() {
@@ -24,7 +50,7 @@
             const people = new Map();
             const spouseRelations = new Set();
 
-            // Parse input
+            // Parse input and build data structure
             input.split('\n').forEach(line => {
                 line = line.trim();
                 if (!line) return;
@@ -37,7 +63,7 @@
                 }
             });
 
-            // Post-process to add children to all spouses
+            // Post-process children for spouses
             people.forEach(person => {
                 person.children.forEach(child => {
                     person.spouses.forEach(spouse => {
@@ -49,24 +75,130 @@
                 });
             });
 
-            // Build family lines
-            const roots = getFamilyRoots(people);
-            const output = [];
-            
-            roots.forEach(surname => {
-                const tree = buildSurnameTree(people, surname);
-                if (tree.length > 0) {
-                    output.push(`Family Tree: ${surname}\n${tree.join('\n')}`);
-                }
-            });
+            // Create vis.js data
+            const nodes = new vis.DataSet();
+            const edges = new vis.DataSet();
+            let nodeIdCounter = 0; // Unique ID for each node
 
-            document.getElementById('output').textContent = output.join('\n\n');
+            // Function to add a person to the network
+            function addPersonToNetwork(name, parentId = null, spouseOf = null) {
+                if (!people.has(name)) {
+                    console.warn(`Person ${name} not found in people data. Skipping.`);
+                    return null;
+                }
+
+                const person = people.get(name);
+                let nodeId = `node-${nodeIdCounter++}`;
+
+
+                let level = undefined;
+
+                if(spouseOf) {
+                    level = nodes.get(spouseOf).level;
+                }
+
+
+                nodes.add({
+                    id: nodeId,
+                    label: person.name,
+                    shape: 'box',
+                    title: `Spouses: ${Array.from(person.spouses).join(', ')}`,
+                    level: level
+                });
+
+                // Create edge from parent to child
+                if (parentId) {
+                    edges.add({
+                        from: parentId,
+                        to: nodeId,
+                        arrows: 'to'
+                    });
+                }
+                return nodeId;
+            }
+
+
+            // Find root people (no parent)
+            const roots = Array.from(people.values()).filter(person => person.parent === null);
+
+            // Recursively build the network
+            function buildNetwork(person, parentId = null) {
+                const nodeId = addPersonToNetwork(person.name, parentId);
+
+                if (nodeId) {  // Only proceed if the node was successfully added
+
+                    // Create edges between spouses
+                    person.spouses.forEach(spouseName => {
+                        const spouse = people.get(spouseName);
+                        if (!spouse) {
+                            console.warn(`Spouse ${spouseName} not found. Skipping spouse edge.`);
+                            return;
+                        }
+
+                        const spouseNodeId = addPersonToNetwork(spouse.name, null, nodeId);
+
+                        edges.add({
+                            from: nodeId,
+                            to: spouseNodeId,
+                            dashes: true,
+                            color: 'red'
+                        });
+                    });
+
+                    person.children.slice().reverse().forEach(childName => {
+                            if (people.has(childName)) {
+                                const child = people.get(childName);
+                                buildNetwork(child, nodeId);
+                            } else {
+                                console.warn(`Child ${childName} not found in people data.`);
+                            }
+                        });
+                }
+            }
+
+            roots.forEach(root => buildNetwork(root));
+
+
+            // Initialize vis.js network
+            const container = document.getElementById('network');
+            const data = {
+                nodes: nodes,
+                edges: edges
+            };
+            const options = {
+                layout: {
+                    hierarchical: {
+                        direction: 'UD',
+                        sortMethod: 'hubsize',
+                        nodeSpacing: 150,
+                        levelSeparation: 200
+                    }
+                },
+                physics: {
+                    hierarchicalRepulsion: {
+                        nodeDistance: 150
+                    }
+                },
+                nodes: {
+                    shape: 'box'
+                },
+                edges: {
+                    arrows: {
+                        to: {
+                            enabled: true
+                        }
+                    }
+                }
+            };
+
+            const network = new vis.Network(container, data, options);
         }
 
+        // Helper functions from previous implementation
         function processSpouses(people, spouseRelations, left, right) {
             addPersonWithAncestry(people, left);
             addPersonWithAncestry(people, right);
-            
+
             const key = [left, right].sort().join('+');
             if (!spouseRelations.has(key)) {
                 people.get(left).spouses.add(right);
@@ -130,67 +262,8 @@
             return null;
         }
 
-        function getFamilyRoots(people) {
-            const surnames = new Set();
-            for (const [name, person] of people) {
-                if (!person.parent) surnames.add(getSurname(name));
-            }
-            return Array.from(surnames);
-        }
-
         function getSurname(name) {
             return name.split(' ').pop();
-        }
-
-        function buildSurnameTree(people, surname) {
-            const roots = Array.from(people.values())
-                .filter(p => !p.parent && getSurname(p.name) === surname)
-                .sort((a, b) => a.name.localeCompare(b.name));
-
-            const output = [];
-            const visited = new Set();
-
-            roots.forEach(root => {
-                const treeLines = [];
-                buildTreeLines(root.name, 0, [], true, treeLines, visited, people, surname);
-                output.push(...treeLines);
-            });
-
-            return output;
-        }
-
-        function buildTreeLines(name, depth, prefixes, isLast, output, visited, people, surname) {
-            if (visited.has(name)) return;
-            visited.add(name);
-
-            const person = people.get(name);
-            const spouses = Array.from(person.spouses)
-                .sort((a, b) => a.localeCompare(b));
-
-            // Build node line with spouses
-            const nodeParts = [name];
-            spouses.forEach(spouse => {
-                if (getSurname(spouse) === surname || getSurname(name) === surname) {
-                    nodeParts.push(spouse);
-                }
-            });
-
-            const connector = depth === 0 ? '' : (isLast ? '└── ' : '├── ');
-            const line = depth === 0 
-                ? nodeParts.join(', ')
-                : prefixes.slice(0, -1).join('') + connector + nodeParts.join(', ');
-
-            output.push(line);
-
-            // Process all children regardless of surname
-            const children = [...person.children].sort((a, b) => a.localeCompare(b));
-
-            children.forEach((child, index) => {
-                const newPrefixes = [...prefixes];
-                newPrefixes.push(index === children.length - 1 ? '    ' : '│   ');
-                buildTreeLines(child, depth + 1, newPrefixes, index === children.length - 1, 
-                             output, visited, people, surname);
-            });
         }
     </script>
 </body>
