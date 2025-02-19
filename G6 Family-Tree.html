@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Interactive Family Tree with G6</title>
+    <style>
+        /* General Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f4f4f4;
+            color: #333;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body.dark-mode {
+            background-color: #333;
+            color: #f4f4f4;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            height: 100%;
+            width: 300px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #fff;
+            overflow-x: hidden;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease-in-out;
+            z-index: 2;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .sidebar-header h2 {
+            margin: 0;
+        }
+
+        .sidebar.dark-mode {
+            background-color: #444;
+            box-shadow: 2px 0 5px rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-300px);
+        }
+
+        .sidebar-toggle {
+            position: static;
+            background-color: #312b86;
+            color: white;
+            border: none;
+            transition: background-color 0.3s;
+            cursor: pointer;
+        }
+
+        .sidebar-toggle:hover {
+            background-color: #564afa;
+        }
+
+        .sidebar-toggle.dark-mode {
+            background-color: #555;
+            color: #fff;
+        }
+
+        .sidebar-toggle.dark-mode:hover {
+            background-color: #666;
+        }
+
+        /* Textarea Styles */
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+            transition: border-color 0.3s, background-color 0.3s, color 0.3s;
+        }
+
+        textarea.dark-mode {
+            background-color: #555;
+            color: #fff;
+            border-color: #666;
+        }
+
+        /* Button Styles */
+        button {
+            background-color: #312b86;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #564afa;
+        }
+
+        button.dark-mode {
+            background-color: #555;
+            color: #fff;
+        }
+
+        button.dark-mode:hover {
+            background-color: #666;
+        }
+
+        /* Network Container Styles */
+        #container {
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+           transition: background-color 0.3s;
+           background-color: #f0f0f0;
+        }
+
+        #container.dark-mode{
+            background-color: #000;
+        }
+
+        /* UI Element Styles */
+       #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px; /* Adjusted position */
+            z-index: 3;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 10px;
+            align-items: center; /* Vertically center the items */
+        }
+
+        #search-input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        /* Tooltip Styles */
+        .tooltip {
+          position: absolute;
+          background-color: #fff;
+          border: 1px solid #ccc;
+          padding: 5px;
+          border-radius: 5px;
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+          z-index: 4;
+          display: none;
+        }
+
+        /* Highlight Styles */
+        .g6-component-node[highlight=true] {
+            opacity: 1;
+        }
+        .g6-component-node[highlight=true] .g6-label {
+            font-weight: bolder;
+            fill: darkred
+        }
+
+        /* Dark Mode Switch */
+        .dark-mode-switch {
+            display: flex;
+            align-items: center;
+            margin-left: 10px; /* Added margin */
+        }
+
+        .dark-mode-switch label {
+            margin-left: 10px;
+            font-size: 16px;
+        }
+
+        /* Toggle Switch Styles */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px #2196F3;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+    </style>
+    <script src="https://gw.alipayobjects.com/os/lib/antv/g6/4.8.7/dist/g6.min.js"></script>
+</head>
+<body>
+   <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>Family Tree Input</h2>
+            <button class="sidebar-toggle">☰</button>
+        </div>
+        <textarea id="input" placeholder="Enter family data here..."></textarea><br>
+        <button onclick="generateAndVisualizeTree()">Generate and Visualize</button>
+        <button onclick="clearAll()">Clear</button>
+    </div>
+
+    <div id="container"></div>
+
+    <div id="controls">
+        <input type="text" id="search-input" placeholder="Search by name">
+        <button onclick="searchNode()">Search</button>
+        <button onclick="fitView()">Fit View</button>
+         <div class="dark-mode-switch">
+            <label class="switch">
+                <input type="checkbox" id="darkModeToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        let graph = null;
+        let familyDataMap = new Map();
+
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarToggle = document.querySelector('.sidebar-toggle');
+        let isSidebarCollapsed = false;
+
+        sidebarToggle.addEventListener('click', () => {
+            isSidebarCollapsed = !isSidebarCollapsed;
+            sidebar.classList.toggle('collapsed', isSidebarCollapsed);
+        });
+
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const body = document.body;
+        const textarea = document.getElementById('input');
+        const buttons = document.querySelectorAll('button');
+        const container = document.getElementById('container'); // Get container
+        function updateDarkMode() {
+            const isDarkMode = darkModeToggle.checked;
+            body.classList.toggle('dark-mode', isDarkMode);
+            sidebar.classList.toggle('dark-mode', isDarkMode);
+            container.classList.toggle('dark-mode', isDarkMode);
+            textarea.classList.toggle('dark-mode', isDarkMode);
+            buttons.forEach(button => button.classList.toggle('dark-mode', isDarkMode));
+
+            if (graph) {
+                const theme = isDarkMode ? 'dark' : 'light';
+
+                graph.updateConfig({
+                    theme: {
+                        type: theme,
+                         base: isDarkMode ? 'dark' : 'light',
+                    },
+                });
+                // Update Node Styling (Example - adjust colors as needed)
+                graph.getNodes().forEach(node => {
+                    const model = node.getModel();
+                    graph.updateItem(node, {
+                        style: {
+                            fill: isDarkMode ? '#333' : '#f0f8ff',  // Darker fill for dark mode
+                            stroke: isDarkMode ? '#fff' : '#6495ed', // Lighter stroke for dark mode
+                            lineWidth: 2,
+                            shadowColor: 'rgba(0, 0, 0, 0.2)',
+                            shadowBlur: 10,
+                            shadowOffsetX: 5,
+                            shadowOffsetY: 5,
+                        },
+                        labelCfg: {
+                            style: {
+                                fill: isDarkMode ? '#fff' : '#333', // Lighter text for dark mode
+                                fontSize: 14,
+                                fontFamily: 'Segoe UI, sans-serif',
+                                fontWeight: 'bold'
+                            }
+                        }
+                    });
+                });
+                 graph.getEdges().forEach(edge => {
+                    const model = edge.getModel();
+                      graph.updateItem(edge, {
+                          style: {
+                              stroke: isDarkMode ? '#ddd' : '#4682b4',
+                               endArrow: {
+                                   path: G6.Arrow.triangle(10, 12, 5),
+                                   fill: isDarkMode ? '#ddd' : '#4682b4',
+                                   d: 5
+                               }
+                          },
+                       });
+                  });
+            }
+        }
+
+        darkModeToggle.addEventListener('change', updateDarkMode);
+
+        window.addEventListener('load', () => {
+          updateDarkMode();
+        });
+
+        function clearAll() {
+            document.getElementById('input').value = '';
+            familyDataMap.clear();
+             if (graph) {
+              graph.destroy();
+            }
+        }
+
+       function generateTree() {
+          const input = document.getElementById('input').value.trim();
+          const people = new Map();
+          const spouseRelations = new Set();
+
+          input.split('\n').forEach(line => {
+              line = line.trim();
+              if (!line) return;
+
+              if (line.includes('+')) {
+                  const [left, right] = line.split('+').map(s => s.trim());
+                  processSpouses(people, spouseRelations, left, right);
+              } else {
+                  processChild(people, line);
+              }
+          });
+
+          people.forEach(person => {
+              person.children.forEach(child => {
+                  person.spouses.forEach(spouse => {
+                      const spouseNode = people.get(spouse);
+                      if (spouseNode && !spouseNode.children.includes(child)) {
+                          spouseNode.children.push(child);
+                      }
+                  });
+              });
+          });
+            const roots = getFamilyRoots(people);
+           const familyTreesData = [];
+
+            roots.forEach(surname => {
+                const treeData = buildSurnameTreeG6(people, surname);
+                if (treeData.nodes.length > 0) {
+                  familyDataMap.set(surname, treeData);
+
+                }
+            });
+
+         return familyDataMap;
+
+      }
+
+        function processSpouses(people, spouseRelations, left, right) {
+            addPersonWithAncestry(people, left);
+            addPersonWithAncestry(people, right);
+            const key = [left, right].sort().join('+');
+            if (!spouseRelations.has(key)) {
+                people.get(left).spouses.add(right);
+                people.get(right).spouses.add(left);
+                spouseRelations.add(key);
+            }
+        }
+
+        function processChild(people, child) {
+            addPersonWithAncestry(people, child);
+            const parent = findExistingParent(people, child);
+            if (parent) linkParentChild(people, parent, child);
+        }
+
+        function addPersonWithAncestry(people, name) {
+            if (!people.has(name)) {
+                people.set(name, createPerson(name));
+                buildAncestryChain(people, name);
+            }
+        }
+
+        function buildAncestryChain(people, name) {
+            let current = name;
+            while (true) {
+                const parentName = extractParentName(current);
+                if (!parentName) break;
+                if (!people.has(parentName)) {
+                    people.set(parentName, createPerson(parentName));
+                }
+                linkParentChild(people, parentName, current);
+                current = parentName;
+            }
+        }
+
+        function createPerson(name) {
+            return {
+                name: name,
+                parent: null,
+                spouses: new Set(),
+                children: [],
+                processed: false
+            };
+        }
+
+        function linkParentChild(people, parent, child) {
+            if (!people.get(parent).children.includes(child)) {
+                people.get(parent).children.push(child);
+            }
+            people.get(child).parent = parent;
+        }
+
+        function extractParentName(name) {
+            return name.split(' ').slice(1).join(' ') || null;
+        }
+
+        function findExistingParent(people, child) {
+            let current = child;
+            while (current) {
+                const parent = people.get(current)?.parent;
+                if (parent && people.has(parent)) return parent;
+                current = parent;
+            }
+            return null;
+        }
+
+        function getFamilyRoots(people) {
+            const surnames = new Set();
+            for (const [name, person] of people) {
+                if (!person.parent) {
+                    surnames.add(getSurname(name));
+                }
+            }
+            return Array.from(surnames);
+        }
+
+        function getSurname(name) {
+            return name.split(' ').pop();
+        }
+
+
+    function buildSurnameTreeG6(people, surname) {
+        const nodes = [];
+        const edges = [];
+        let nodeIdCounter = 0;
+
+        const roots = Array.from(people.values())
+            .filter(p => !p.parent && getSurname(p.name) === surname)
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        function addNodeAndEdges(person, parentId = null) {
+            const nodeId = `${person.name}-${surname}-${nodeIdCounter++}`;
+            const displayedName = person.name.split(' ').slice(0, 2).join(' '); //First 2 names only.
+
+            nodes.push({
+                id: nodeId,
+                label: displayedName,
+                type: 'ellipse',
+                size: [160, 80],
+                style: {
+                    fill: '#f0f8ff',
+                    stroke: '#6495ed',
+                    lineWidth: 2,
+                    shadowColor: 'rgba(0, 0, 0, 0.2)',
+                    shadowBlur: 10,
+                    shadowOffsetX: 5,
+                    shadowOffsetY: 5,
+                },
+                labelCfg: {
+                    position: 'center',
+                    style: {
+                        fill: '#333',
+                        fontSize: 14,
+                        fontFamily: 'Segoe UI, sans-serif',
+                        fontWeight: 'bold'
+                    }
+                },
+                data: person
+            });
+
+
+            person.spouses.forEach(spouseName => {
+                if (getSurname(person.name) === surname) {
+                    const spouse = people.get(spouseName);
+                    if (spouse) {
+                        const spouseNodeId = `${spouseName}-${surname}-${nodeIdCounter++}`;
+                        const displayedSpouseName = spouseName.split(' ').slice(0, 2).join(' ');
+                          nodes.push({
+                            id: spouseNodeId,
+                            label: displayedSpouseName,
+                             type: 'ellipse',
+                             size: [160, 80],
+                            style: {
+                                fill: '#f0f8ff',
+                                stroke: '#6495ed',
+                                lineWidth: 2,
+                                shadowColor: 'rgba(0, 0, 0, 0.2)',
+                                shadowBlur: 10,
+                                shadowOffsetX: 5,
+                                shadowOffsetY: 5,
+                            },
+                            labelCfg: {
+                                position: 'center',
+                                style: {
+                                    fill: '#333',
+                                    fontSize: 14,
+                                    fontFamily: 'Segoe UI, sans-serif',
+                                    fontWeight: 'bold'
+                                }
+                            },
+                             data: spouse
+                        });
+                        edges.push({
+                            source: nodeId,
+                            target: spouseNodeId,
+                            type: 'line',
+                            style: {
+                                stroke: '#778899',
+                                lineWidth: 2,
+                                lineDash: [5, 5],
+                            }
+                        });
+                    }
+                }
+            });
+
+
+            if (parentId !== null) {
+                edges.push({
+                    source: parentId,
+                    target: nodeId,
+                    type: 'cubic-vertical',
+                    style: {
+                        stroke: '#4682b4',
+                        lineWidth: 2,
+                        endArrow: {
+                            path: G6.Arrow.triangle(10, 12, 5),
+                            fill: '#4682b4',
+                            d: 5
+                        }
+                    }
+                });
+            }
+
+
+            person.children.forEach(childName => {
+                const child = people.get(childName);
+                if (child) {
+                    addNodeAndEdges(child, nodeId);
+                }
+            });
+        }
+
+        roots.forEach(root => addNodeAndEdges(root));
+        return { nodes, edges };
+    }
+
+
+       function generateAndVisualizeTree() {
+            clearHighlight();
+            familyDataMap = generateTree();
+           if(familyDataMap.size > 0){
+
+              if (graph) {
+                    graph.destroy();
+                }
+
+              graph = new G6.Graph({
+                container: 'container',
+                width: window.innerWidth,
+                height: window.innerHeight,
+                modes: {
+                    default: ['drag-canvas', 'zoom-canvas', 'drag-node', 'activate-relations'],
+                },
+                layout: {
+                    type: 'dagre',
+                    rankdir: 'TB',
+                    align: 'UL',
+                    nodesep: 50,
+                    ranksep: 80,
+                    controlPoints: true,
+
+                },
+                defaultNode: {},
+                defaultEdge: {},
+            });
+
+             let combinedData = { nodes: [], edges: [] };
+
+              for (const treeData of familyDataMap.values()) {
+                  combinedData.nodes.push(...treeData.nodes);
+                  combinedData.edges.push(...treeData.edges);
+              }
+
+              graph.data(combinedData);
+              graph.render();
+              graph.fitView();
+
+                const tooltip = document.getElementById('tooltip');
+
+                graph.on('node:mouseenter', (evt) => {
+                  const { item } = evt;
+                  const nodeModel = item.getModel();
+                  const { x, y } = evt;
+                  const name = nodeModel.label;
+                  tooltip.innerHTML = `<b>${name}</b><br>Spouses: ${Array.from(nodeModel.data.spouses).join(', ') || 'None'}`;
+                  tooltip.style.top = `${y + 10}px`;
+                  tooltip.style.left = `${x + 10}px`;
+                  tooltip.style.display = 'block';
+                });
+
+                graph.on('node:mouseleave', () => {
+                  tooltip.style.display = 'none';
+                });
+
+                 graph.on('node:click', (evt) => {
+
+                    graph.getNodes().forEach(n => graph.setItemState(n, 'highlight', false));
+
+                    const node = evt.item;
+                    const nodeId = node.getID();
+                    const nodeModel = node.getModel();
+                    const relatedNodes = [];
+
+                    if (nodeModel.parentId) {
+                        relatedNodes.push(nodeModel.parentId);
+                    }
+
+                    let currentSurName = nodeId.split('-')[1];
+                    const peopleData = familyDataMap.get(currentSurName);
+
+                    if (peopleData) {
+                      for(let i = 0; i< peopleData.edges.length; i++){
+                        let edge = peopleData.edges[i];
+                          if (edge.source === nodeId ) {
+                               if(edge.style && edge.style.lineDash){
+                                relatedNodes.push(edge.target);
+                               }
+                          }
+                      }
+                    }
+
+                    if (peopleData) {
+                      for(let i = 0; i< peopleData.edges.length; i++){
+                        let edge = peopleData.edges[i];
+                          if (edge.source === nodeId ) {
+                               if(!edge.style || !edge.style.lineDash){
+                                relatedNodes.push(edge.target);
+                               }
+                          }
+                      }
+                    }
+
+                   graph.focusItem(nodeId, true, {
+                        easing: 'easeCubic',
+                        duration: 500,
+                    });
+                    graph.getNodes().forEach(n => {
+                        if (relatedNodes.includes(n.getID()) || n.getID() === nodeId) {
+                           graph.setItemState(n, 'highlight', true);
+                         } else {
+                            graph.setItemState(n, 'highlight', false);
+                        }
+                    });
+                });
+
+           }else{
+             alert("No Family data to display");
+           }
+        }
+
+         function fitView() {
+            if (graph) {
+                graph.fitView();
+            }
+        }
+
+        function searchNode() {
+          const searchTerm = document.getElementById('search-input').value.trim().toLowerCase();
+          if (!searchTerm || !graph) return;
+
+          // First, clear any previous highlighting
+          graph.getNodes().forEach(node => graph.setItemState(node, 'highlight', false));
+
+          // Array to store matching nodes
+          const matchingNodes = [];
+
+          graph.getNodes().forEach(node => {
+            const nodeModel = node.getModel();
+            const label = nodeModel.label.toLowerCase();
+
+            if (label.includes(searchTerm)) {
+              matchingNodes.push(node);
+            }
+          });
+
+          if (matchingNodes.length > 0) {
+            // Focus on the first matching node
+            graph.focusItem(matchingNodes[0], true, {
+              easing: 'easeCubic',
+              duration: 500,
+            });
+
+            // Highlight all matching nodes
+            matchingNodes.forEach(node => {
+              graph.setItemState(node, 'highlight', true);
+            });
+          } else {
+            alert('No matching nodes found.');
+          }
+        }
+
+        function clearHighlight(){
+            if(graph){
+                graph.getNodes().forEach(n => graph.setItemState(n, 'highlight', false));
+            }
+        }
+    </script>
+</body>
+</html>

@@ -180,7 +180,7 @@ Family Tree: خالد
 # Expanded Family Tree Generator Documentation
 
 ## Architecture Overview
-![System Architecture Diagram](https://mermaid.ink/svg/eyJjb2RlIjoiZ3JhcGggTFJcbiAgICBJbnB1dC1GYW1pbHlEYXRhIC0tPiBQYXJzaW5nTW9kdWxlXG4gICAgUGFyc2luZ01vZHVsZSAtLT4gRGF0YV9TdHJ1Y3R1cmVzXG4gICAgRGF0YV9TdHJ1Y3R1cmVzIC0tPiBUcmVlQnVpbGRlclxuICAgIFRyZWVCdWlsZGVyIC0tPiBWaXN1YWxpemF0aW9uRW5naW5lXG4gICAgVmlzdWFsaXphdGlvbkVuZ2luZSAtLT4gT3V0cHV0UmVuZGVyZXIiLCJtZXJtYWlkIjp7InRoZW1lIjoiZGVmYXVsdCJ9fQ)
+![System Architecture Diagram](Architecture%20Overview.svg)
 
 ## In-Depth Implementation Guide
 
