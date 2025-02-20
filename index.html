@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Family Tree Generator</title>
+    <!-- External CSS dependencies -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <!-- Local CSS -->
+    <link href="style.css" rel="stylesheet">
+</head>
+<body class="dark-mode">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>Family Tree Generator</h2>
+        </div>
+        
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-input" placeholder="Search family members...">
+            <div id="searchResults" class="search-results"></div>
+        </div>
+        
+        <div class="input-container">
+            <textarea id="input" placeholder="Enter family data here"></textarea>
+            <div class="controls">
+                <button onclick="generateTree()">Generate</button>
+                <button class="secondary" onclick="clearAll()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+
+    <div id="network"></div>
+
+    <div class="floating-controls">
+        <button id="layout-toggle" class="dark-mode-toggle" onclick="toggleLayout()" title="Toggle Layout">⇕</button>
+        <button class="fit-view-toggle" onclick="fitView()" title="Fit View">⤡</button>
+        <button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌓</button>
+    </div>
+
+    <!-- External JS dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.min.js"></script>
+    <!-- Local JS -->
+    <script src="script.js"></script>
+</body>
+</html>

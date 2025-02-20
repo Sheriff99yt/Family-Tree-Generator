@@ -1,162 +1,375 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>Family Tree Generator</title>
-        <style>
-        *, *:before, *:after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Roboto', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; background-color: #f8f9fa; color: #343a40; overflow: hidden; display: flex; transition: background-color 0.3s, color 0.3s; }
-        body.dark-mode { background-color: #212529; color: #f8f9fa; }
-        .sidebar { width: 320px; background-color: #fff; border-right: 1px solid #dee2e6; padding: 25px; display: flex; flex-direction: column; transition: transform 0.3s ease-in-out, border-color 0.3s, background-color 0.3s; z-index: 100; }
-        .sidebar.dark-mode { background-color: #343a40; border-right-color: #495057; }
-        .sidebar-header { margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
-        .sidebar-header h2 { font-size: 1.5rem; font-weight: 500; margin: 0; }
-        .sidebar.collapsed { transform: translateX(-300px); }
-        .sidebar-toggle { transform: translateX(60px); background-color: transparent; color: #007bff; border: none; font-size: 1.5rem; transition: color 0.3s; }
-        .sidebar-toggle:hover { transform: translateX(62px); color: #495057; }
-        .sidebar-toggle.dark-mode { color: #adb5bd; }
-        .sidebar-toggle.dark-mode:hover { color: #fff; }
-        .search-container { margin-bottom: 20px; }
-        .search-input { width: 100%; padding: 12px 15px; border: 1px solid #ced4da; border-radius: 0.25rem; font-size: 1rem; transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s, color 0.3s; background-color: #fff; color: #495057; }
-        .search-input:focus { border-color: #80bdff; box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); outline: 0; }
-        .search-input.dark-mode { background-color: #495057; color: #fff; border-color: #5a6268; }
-        .search-results { position: absolute; width: calc(320px - 50px); max-height: 250px; overflow-y: auto; background-color: #fff; border: 1px solid #ced4da; border-top: none; border-bottom-left-radius: 0.25rem; border-bottom-right-radius: 0.25rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 101; display: none; transition: border-color 0.3s, background-color 0.3s, color 0.3s; }
-        .search-results.dark-mode { background-color: #495057; border-color: #5a6268; }
-        .search-result-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #eee; transition: background-color 0.2s, color 0.3s; }
-        .search-result-item:last-child { border-bottom: none; }
-        .search-result-item:hover { background-color: #f0f0f0; }
-        .search-result-item.dark-mode:hover { background-color: #5a6268; }
-        .search-result-item.dark-mode { color: #fff; }
-        textarea { width: 100%; height: 150px; padding: 12px 15px; border: 1px solid #ced4da; border-radius: 0.25rem; font-family: 'Roboto', monospace; font-size: 0.9rem; resize: vertical; margin-bottom: 20px; transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s, color 0.3s; background-color: #fff; color: #495057; }
-        textarea:focus { border-color: #80bdff; box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); outline: 0; }
-        textarea.dark-mode { background-color: #495057; color: #fff; border-color: #5a6268; }
-        button { background-color: #007bff; color: white; padding: 12px 20px; border: none; cursor: pointer; border-radius: 0.25rem; font-size: 1rem; transition: background-color 0.3s, transform 0.2s; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .sidebar button:last-child { margin-right: 0; }
-        button:hover { background-color: #0056b3; transform: translateY(-1px); box-shadow: 0 3px 6px rgba(0,0,0,0.15); }
-        button:active { transform: translateY(0); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        button.dark-mode { background-color: #6c757d; }
-        button.dark-mode:hover { background-color: #5a6268; }
-        #network { flex-grow: 1; height: 100vh; position: relative; z-index: 1; }
-        .dark-mode-switch { display: flex; align-items: center; margin-bottom: 10px; }
-        .dark-mode-switch label { margin-left: 10px; font-size: 1rem; color: #6c757d; transition: color 0.3s; }
-        .dark-mode-switch label.dark-mode { color: #adb5bd; }
-        .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 28px; }
-        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #007bff; }
-        input:focus + .slider { box-shadow: 0 0 1px #007bff; }
-        input:checked + .slider:before { transform: translateX(22px); }
-        .vis-network canvas { outline: none; }
-        .vis-node.vis-box { border-radius: 0.5rem; border-width: 2px; padding: 8px 15px; font-size: 1rem; color: #495057; background: linear-gradient(145deg, #e2e8ec, #ffffff); box-shadow: 3px 3px 6px #bababa, -3px -3px 6px #ffffff; transition: color 0.3s, background 0.3s, box-shadow 0.3s, border-color 0.3s; }
-        .vis-node.vis-box.dark-mode { color: #f8f9fa; background: linear-gradient(145deg, #373e45, #495057); box-shadow: 3px 3px 6px #272b2e, -3px -3px 6px #515960; border-color: #5a6268 !important; }
-        .vis-node.vis-box.vis-hover { box-shadow: 5px 5px 10px #bababa, -5px -5px 10px #ffffff; }
-        .vis-node.vis-box.dark-mode.vis-hover { box-shadow: 5px 5px 10px #272b2e, -5px -5px 10px #515960; }
-        .vis-edge { color: #6c757d; transition: color 0.3s; }
-        .vis-edge.dark-mode { color: #adb5bd; }
-        .vis-edge.vis-hover { color: #495057; }
-        .vis-edge.dark-mode.vis-hover { color: #fff; }
-    </style>
-        <link
-            href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css"
-            rel="stylesheet" type="text/css" />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Roboto+Mono&display=swap"
-            rel="stylesheet">
-        <script
-            src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.min.js"></script>
-    </head>
-    <body class="dark-mode">
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h2>Family Tree Input</h2>
-                <button class="sidebar-toggle">></button>
-            </div>
-            <div class="search-container">
-                <input type="text" id="searchInput"
-                    class="search-input dark-mode"
-                    placeholder="Search Person...">
-                <div id="searchResults" class="search-results dark-mode"></div>
-            </div>
-            <textarea id="input"
-                placeholder="Enter family data here..."></textarea><br>
-            <button onclick="generateTree()">Generate</button>
-            <button onclick="clearAll()">Clear</button>
-            <button id="fitViewButton" onclick="fitView()">Fit View</button>
-
-            <div class="dark-mode-switch">
-                <label class="switch">
-                    <input type="checkbox" id="darkModeToggle" checked>
-                    <span class="slider"></span>
-                </label>
-                <label for="darkModeToggle"
-                    class="dark-mode-switch-label dark-mode">Dark Mode</label>
-            </div>
-        </div>
-
-        <div id="network"></div>
-
-        <script
-            src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
-        <script>
-        let network = null;
-        let isDarkMode = true;
-        let fuse = null;
-        let peopleData = new Map();
-
-        const sidebar = document.querySelector('.sidebar');
-        const sidebarToggle = document.querySelector('.sidebar-toggle');
-        let isSidebarCollapsed = false;  // Keep track of sidebar state.
-
-        sidebarToggle.addEventListener('click', () => {
-            isSidebarCollapsed = !isSidebarCollapsed;
-            sidebar.classList.toggle('collapsed', isSidebarCollapsed);
-        });
-
-        const darkModeToggle = document.getElementById('darkModeToggle');
-        const body = document.body;
-        const textarea = document.getElementById('input');
-        const buttons = document.querySelectorAll('button');
-        const searchInput = document.getElementById('searchInput');
-        const searchResults = document.getElementById('searchResults');
-        const darkModeSwitchLabel = document.querySelector('.dark-mode-switch-label');
-
-        function applyDarkModeToElements() {
-            body.classList.toggle('dark-mode', isDarkMode);
-            sidebar.classList.toggle('dark-mode', isDarkMode);
-            textarea.classList.toggle('dark-mode', isDarkMode);
-            buttons.forEach(button => button.classList.toggle('dark-mode', isDarkMode));
-            sidebarToggle.classList.toggle('dark-mode', isDarkMode);
-            searchInput.classList.toggle('dark-mode', isDarkMode);
-            searchResults.classList.toggle('dark-mode', isDarkMode);
-            darkModeSwitchLabel.classList.toggle('dark-mode', isDarkMode);
-            document.querySelectorAll('.search-result-item').forEach(item => item.classList.toggle('dark-mode', isDarkMode));
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Family Tree Generator</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --secondary: #64748b;
+            --secondary-hover: #475569;
+            --background: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+            --card-bg: #f8fafc;
+            --node-bg: #f1f5f9;
         }
 
-        darkModeToggle.addEventListener('change', () => {
-            isDarkMode = darkModeToggle.checked;
-            applyDarkModeToElements();
-        });
+        .dark-mode {
+            --primary: #818cf8;
+            --primary-hover: #6366f1;
+            --secondary: #94a3b8;
+            --secondary-hover: #7c8ba1;
+            --background: #0f172a;
+            --text: #f8fafc;
+            --border: #334155;
+            --card-bg: #1e293b;
+            --node-bg: #334155;
+        }
 
-        window.addEventListener('load', () => {
-          applyDarkModeToElements();
-        });
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 80%;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--card-bg);
+            border-right: 1px solid var(--border);
+            padding: 1rem;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .mobile-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 60px;
+            height: 50px;
+            border-radius: 10px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            z-index: 101;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .mobile-toggle.open {
+            left: calc(80% + 20px);
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.5rem;
+            flex-direction: column;
+            margin-top: 1rem;
+        }
+
+        button {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background-color: var(--primary);
+            color: white;
+            font-size: 1rem;
+        }
+
+        button.secondary {
+            background-color: var(--secondary);
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+        }
+
+        button:active {
+            filter: brightness(0.9);
+        }
+
+        .floating-controls {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            z-index: 100;
+        }
+
+        .dark-mode-toggle,
+        .fit-view-toggle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease;
+        }
+
+        .dark-mode-toggle:hover,
+        .fit-view-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        textarea {
+            width: 100%;
+            height: 230px;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            background: var(--background);
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            resize: vertical;
+            font-size: 14px;
+        }
+
+        .input-container {
+            position: relative;
+            margin-top: 1rem;
+        }
+
+        .input-container .controls {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            right: 5px;
+            padding: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .input-container .controls button {
+            flex: 1;
+            padding: 0.75rem;
+        }
+
+        .search-container {
+            position: relative;
+            margin-top: 1rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            background: var(--background);
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        .search-results {
+            position: absolute;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            margin-top: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 101;
+        }
+
+        .search-result-item {
+            padding: 1rem;
+            cursor: pointer;
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        .search-result-item:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        #network {
+            height: 100vh;
+            background: var(--background);
+            touch-action: pan-x pan-y;
+        }
+
+        @media (min-width: 768px) {
+            .sidebar {
+                width: 320px;
+                height: 100vh;
+                top: 0;
+                bottom: auto;
+                left: 0;
+                transform: translateX(0);
+                border-right: 1px solid var(--border);
+                border-top: none;
+                padding: 1.5rem;
+                box-shadow: none;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .mobile-toggle {
+                display: none;
+            }
+
+            #network {
+                margin-left: 320px;
+                height: 100vh;
+            }
+
+            .controls {
+                flex-direction: row;
+                gap: 0.75rem;
+            }
+
+            button {
+                padding: 0.625rem 1.25rem;
+            }
+
+            .floating-controls {
+                bottom: 1.5rem;
+                right: 1.5rem;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .floating-controls {
+                bottom: 90px;
+                right: 1rem;
+            }
+            
+            .dark-mode-toggle,
+            .fit-view-toggle {
+                width: 42px;
+                height: 42px;
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.min.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+</head>
+<body class="dark-mode">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>Family Tree Generator</h2>
+        </div>
+        
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-input" placeholder="Search family members...">
+            <div id="searchResults" class="search-results"></div>
+        </div>
+        
+        <div class="input-container">
+            <textarea id="input" placeholder="Enter family data here"></textarea>
+            <div class="controls">
+                <button onclick="generateTree()">Generate</button>
+                <button class="secondary" onclick="clearAll()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+
+    <div id="network"></div>
+
+    <div class="floating-controls">
+        <button id="layout-toggle" class="dark-mode-toggle" onclick="toggleLayout()" title="Toggle Layout">⇕</button>
+        <button class="fit-view-toggle" onclick="fitView()" title="Fit View">⤡</button>
+        <button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌓</button>
+    </div>
+
+    <script>
+        let peopleData = new Map();
+        let isDarkMode = true;
+        let network;
+        let fuse;
+        let layoutMode = 'vertical';
+
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('dark-mode', isDarkMode);
+            if (network) network.redraw();
+        }
 
         function clearAll() {
-            textarea.value = '';
+            document.getElementById('input').value = '';
             if (network) network.destroy();
             peopleData.clear();
             fuse = null;
-            searchInput.value = '';
-            searchResults.innerHTML = '';
-            searchResults.style.display = 'none';
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').innerHTML = '';
+            document.getElementById('searchResults').style.display = 'none';
         }
 
         function fitView() {
-            if (network) network.fit();
+            if (network) network.fit({
+                animation: {
+                    duration: 1000,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
         }
 
         function generateTree() {
-            const input = textarea.value.trim();
+            const input = document.getElementById('input').value.trim();
             peopleData.clear();
             const spouseRelations = new Set();
             const mothers = new Set();
@@ -165,15 +378,14 @@
                 line = line.trim();
                 if (!line) return;
 
-                const [left = '', right = ''] = line.split('+').map(s => s.trim()); //Destructure with defaults
-                if (left && right) {  // Check for valid spouses
+                if (line.includes('+')) {
+                    const [left, right] = line.split('+').map(s => s.trim());
                     processSpouses(peopleData, spouseRelations, left, right, mothers);
                 } else {
-                    processChild(peopleData, line);
+                    processChild(peopleData, line, mothers);
                 }
             });
 
-            // Ensure children are added to both spouses
             peopleData.forEach(person => {
                 person.children.forEach(child => {
                     person.spouses.forEach(spouse => {
@@ -195,10 +407,10 @@
                 includeScore: true,
                 shouldSort: true,
             });
-            setupSearch(); // Call setupSearch after fuse is initialized
+            setupSearch();
         }
 
-       function processSpouses(people, spouseRelations, left, right, mothers) {
+        function processSpouses(people, spouseRelations, left, right, mothers) {
             addPersonWithAncestry(people, left);
             addPersonWithAncestry(people, right);
 
@@ -207,14 +419,17 @@
                 people.get(left).spouses.add(right);
                 people.get(right).spouses.add(left);
                 spouseRelations.add(key);
-                mothers.add(right);  //right side is mother.
+                mothers.add(right);
             }
         }
 
-        function processChild(people, child) {
+        function processChild(people, child, mothers) {
             addPersonWithAncestry(people, child);
-            const parent = findExistingParent(people, child);
-            if (parent) linkParentChild(people, parent, child);
+            // Pass the mothers set to findExistingParent
+            const potentialParent = findExistingParent(people, child, mothers);
+            if (potentialParent) {
+                linkParentChild(people, potentialParent, child);
+            }
         }
 
         function addPersonWithAncestry(people, name) {
@@ -235,48 +450,45 @@
                     const parentDisplayName = parentName.split(' ').slice(0, 2).join(' ');
                     people.set(parentName, createPerson(parentName, parentDisplayName));
                 }
+
                 linkParentChild(people, parentName, current);
                 current = parentName;
             }
         }
 
         function createPerson(name, displayName) {
-            return { name, displayName, parent: null, spouses: new Set(), children: [], processed: false };
+            return {
+                name: name,
+                displayName: displayName,
+                parents: [],
+                spouses: new Set(),
+                children: [],
+                processed: false
+            };
         }
 
         function linkParentChild(people, parent, child) {
-            if (!people.get(parent).children.includes(child)) {
-                people.get(parent).children.push(child);
+            const childObj = people.get(child);
+            if (!childObj.parents.includes(parent)) {
+                childObj.parents.push(parent);
             }
-            people.get(child).parent = parent;
+            const parentObj = people.get(parent);
+            if (!parentObj.children.includes(child)) {
+                parentObj.children.push(child);
+            }
         }
 
         function extractParentName(name) {
             return name.split(' ').slice(1).join(' ') || null;
         }
 
-        function findExistingParent(people, child) {
-            let current = child;
-            while (current) {
-                const parent = people.get(current)?.parent;
-                if (parent && people.has(parent)) return parent;
-                current = parent;
+        // Update findExistingParent to receive mothers as a parameter.
+        function findExistingParent(people, child, mothers) {
+            const person = people.get(child);
+            if (person.parents.length) {
+                return person.parents.find(p => mothers.has(p)) || person.parents[0];
             }
             return null;
-        }
-
-        function getFamilyRoots(people) {
-            const surnames = new Set();
-            for (const person of people.values()) { // Iterate directly over values
-                if (!person.parent) {
-                    surnames.add(getSurname(person.name));
-                }
-            }
-            return Array.from(surnames);
-        }
-
-        function getSurname(name) {
-            return name.split(' ').pop();
         }
 
         function createFamilyTrees(people, mothers) {
@@ -287,7 +499,7 @@
 
             surnames.forEach(surname => {
                 const roots = Array.from(people.values())
-                    .filter(p => !p.parent && getSurname(p.name) === surname)
+                    .filter(p => p.parents.length === 0 && getSurname(p.name) === surname)
                     .sort((a, b) => a.name.localeCompare(b.name));
 
                 roots.forEach(root => {
@@ -300,8 +512,9 @@
                         const nodeId = `${current.name}@${current.tree}`;
 
                         if (!treeNodes.has(nodeId)) {
-                            const nodeColorOptions = getNodeColorOptions(current.tree, isDarkMode);
-
+                            const baseColor = stringToColor(current.tree);
+                            const desaturatedColor = desaturateColor(baseColor, 70);
+                            
                             nodes.push({
                                 id: nodeId,
                                 label: current.displayName,
@@ -310,41 +523,63 @@
                                 shape: 'box',
                                 margin: 10,
                                 font: { size: 14 },
-                                ...nodeColorOptions
+                                color: {
+                                    background: desaturatedColor,
+                                    border: darkenColor(desaturatedColor, 20),
+                                    highlight: {
+                                        background: '#FFFF00',
+                                        border: '#000000'
+                                    }
+                                }
                             });
                             treeNodes.set(nodeId, true);
                         }
 
-                        // Spouse handling. Use Array.from to handle Set properly.
-                        Array.from(person.spouses).forEach(spouse => { //Use Array.from
+                        Array.from(person.spouses).forEach(spouse => {
                             const spouseNodeId = `${spouse}@${current.tree}`;
                             const edgePair = [nodeId, spouseNodeId].sort().join('+');
 
                             if (!processedPairs.has(edgePair)) {
-                                edges.push({ from: nodeId, to: spouseNodeId, color: '#FF0000', dashes: true, width: 2 });
+                                edges.push({
+                                    from: nodeId,
+                                    to: spouseNodeId,
+                                    color: '#FF0000',
+                                    dashes: true,
+                                    width: 2
+                                });
                                 processedPairs.add(edgePair);
 
                                 const spousePerson = people.get(spouse);
-                                if(spousePerson) { //check spousePerson before adding to queue
-                                    queue.unshift({ name: spouse, displayName: spousePerson.displayName, level: current.level, tree: current.tree });
-                                }
-
+                                queue.unshift({
+                                    name: spouse,
+                                    displayName: spousePerson.displayName,
+                                    level: current.level,
+                                    tree: current.tree
+                                });
                             }
                         });
 
-                        // Child handling
                         person.children.forEach(child => {
                             const childNodeId = `${child}@${current.tree}`;
                             const edgeId = `${nodeId}->${childNodeId}`;
 
                             if (!processedPairs.has(edgeId)) {
-                                edges.push({ from: nodeId, to: childNodeId, arrows: 'to', color: '#6c757d', motherEdge: mothers.has(current.name) });
+                                edges.push({
+                                    from: nodeId,
+                                    to: childNodeId,
+                                    arrows: 'to',
+                                    color: '#2B7CE9',
+                                    motherEdge: mothers.has(current.name)
+                                });
                                 processedPairs.add(edgeId);
 
                                 const childPerson = people.get(child);
-                                 if (childPerson) { // check childPerson exists.
-                                    queue.push({ name: child, displayName: childPerson.displayName, level: current.level + 1, tree: current.tree });
-                                }
+                                queue.push({
+                                    name: child,
+                                    displayName: childPerson.displayName,
+                                    level: current.level + 1,
+                                    tree: current.tree
+                                });
                             }
                         });
                     }
@@ -358,155 +593,125 @@
             const container = document.getElementById('network');
             if (network) network.destroy();
 
-            const filteredEdges = edges.filter(edge => {
-                const fromName = edge.from.split('@')[0];
-                return !(edge.motherEdge && mothers.has(fromName));
-            });
-
-            const data = { nodes, edges: filteredEdges };
+            const data = {
+                nodes: nodes,
+                edges: edges
+            };
 
             const options = {
-                layout: { hierarchical: { enabled: true, direction: 'UD', sortMethod: 'directed', levelSeparation: 180, nodeSpacing: 150, treeSpacing: 250 } },
-                edges: { smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.4 }, arrows: { to: { scaleFactor: 0.8 } }, width: 1.5 },
-                physics: { hierarchicalRepulsion: { nodeDistance: 120 }, solver: 'hierarchicalRepulsion' },
-                interaction: { dragNodes: true, dragView: true, zoomView: true, hover: true }
+                layout: {
+                    hierarchical: {
+                        enabled: true,
+                        direction: 'UD',
+                        sortMethod: 'directed',
+                        levelSeparation: 200,
+                        nodeSpacing: 200,
+                        treeSpacing: 200
+                    }
+                },
+                edges: {
+                    smooth: {
+                        type: "vertical"
+                    },
+                    arrows: { to: { scaleFactor: 1 } }
+                },
+                physics: true,
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true
+                }
             };
 
             network = new vis.Network(container, data, options);
 
-
-        }
-
-        function getNodeColorOptions(group, isDarkMode) {
-            const baseColor = stringToColor(group);
-            const desaturatedColor = desaturateColor(baseColor, 60);
-
-            const lightModeOptions = {
-                color: { background: desaturatedColor, border: darkenColor(desaturatedColor, 20), highlight: { background: '#FFFFE0', border: '#000000' } },
-                className: 'vis-box'
-            };
-
-            const darkModeOptions = {
-                color: { background: darkenColor(desaturatedColor, 50), border: darkenColor(desaturatedColor, 70), highlight: { background: '#FFFFE0', border: '#ffffff' } },
-                className: 'vis-box dark-mode'
-            };
-
-            return isDarkMode ? darkModeOptions : lightModeOptions;
+            network.on("click", function (params) {
+            });
         }
 
         function setupSearch() {
-            function handleSearch() {
-                const query = searchInput.value.trim(); // Get trimmed value.
-                searchResults.innerHTML = '';  // Clear previous results.
-                searchResults.style.display = query ? 'block' : 'none'; // Show/hide based on query.
+            const searchInput = document.getElementById('searchInput');
+            const searchResults = document.getElementById('searchResults');
 
-                if (query && fuse) {
-                    const results = fuse.search(query);
-                    displaySearchResults(results);
-                }
-            }
-
-            searchInput.addEventListener('input', handleSearch);
-            searchInput.addEventListener('focus', handleSearch);  // Also search on focus.
-
-
-            document.addEventListener('click', (event) => {
-                if (!searchInput.contains(event.target) && !searchResults.contains(event.target)) {
+            searchInput.addEventListener('input', () => {
+                const query = searchInput.value;
+                if (!fuse || query.trim() === '') {
+                    searchResults.innerHTML = '';
                     searchResults.style.display = 'none';
+                    return;
+                }
+                const results = fuse.search(query);
+                displaySearchResults(results);
+                searchResults.style.display = 'block';
+            });
+            
+            document.addEventListener('click', (event) => {
+                const isClickInsideSearch = searchInput.contains(event.target);
+                const isClickOnResultItem = searchResults.contains(event.target);
+                if (!isClickInsideSearch && !isClickOnResultItem) {
+                    searchResults.style.display = 'none';
+                }
+            });
+            
+            searchInput.addEventListener('focus', () => {
+                if (searchInput.value.trim() !== '' && fuse) {
+                    const results = fuse.search(searchInput.value);
+                    displaySearchResults(results);
+                    searchResults.style.display = 'block';
                 }
             });
         }
 
         function displaySearchResults(results) {
-            searchResults.innerHTML = ''; // Clear previous results
-
+            const searchResults = document.getElementById('searchResults');
+            const searchInput = document.getElementById('searchInput');
+            searchResults.innerHTML = '';
             results.slice(0, 10).forEach(result => {
                 const item = document.createElement('div');
                 item.classList.add('search-result-item');
-                if (isDarkMode) item.classList.add('dark-mode');  // Add dark-mode class
                 item.innerHTML = highlightMatch(result.item.name, searchInput.value);
-
                 item.addEventListener('click', () => {
-                  if (network) {
-                      const nodeId = findNodeIdByName(result.item.name);
-                      if (nodeId) {
-                          network.focus(nodeId, { scale: 1.5, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
-                          highlightNodeAndConnections(nodeId);
-                      }
-                  }
-                  searchResults.style.display = 'none'; // Hide results after click.
+                    if (network) {
+                        const nodeId = findNodeIdByName(result.item.name);
+                        if (nodeId) {
+                            network.focus(nodeId, {
+                                scale: 1.5,
+                                animation: {
+                                    duration: 500,
+                                    easingFunction: 'easeInOutQuad'
+                                }
+                            });
+                            network.selectNodes([nodeId]);
+                        }
+                    }
+                    searchResults.innerHTML = '';
+                    searchResults.style.display = 'none';
                 });
+                if (isDarkMode) {
+                    item.classList.add('dark-mode');
+                }
                 searchResults.appendChild(item);
             });
         }
 
         function findNodeIdByName(fullName) {
-            if (!network) return null; // Early exit if network not initialized.
-            return network.body.data.nodes.getIds().find(nodeId => nodeId.split('@')[0] === fullName) || null;
-        }
-
-        function highlightNodeAndConnections(nodeId) {
-              if (!network) return;
-
-              const connectedEdges = network.getConnectedEdges(nodeId);
-              const connectedNodes = network.getConnectedNodes(nodeId);
-
-              // Reset all nodes and edges to their default colors
-              network.body.data.nodes.forEach(node => {
-                if (node.savedColor) {
-                  node.color = node.savedColor;
-                  node.className = node.savedClassName;
-                } else {
-                  // If there's no saved color, it might not have been highlighted yet.
-                  //  Apply the default color based on its group.  Important for first click
-                  Object.assign(node, getNodeColorOptions(node.group, isDarkMode));
-
-                }
-                network.body.data.nodes.update(node); //Apply update
-              });
-
-              network.body.data.edges.forEach(edge => {
-                edge.color = edge.savedColor || { color: isDarkMode? '#adb5bd' : '#6c757d'}; //Use saved color.
-                edge.width = 1.5;
-                network.body.data.edges.update(edge); //Apply update.
-              });
-
-              // Highlight the clicked node
-              let clickedNode = network.body.data.nodes.get(nodeId);
-              clickedNode.savedColor = clickedNode.color || {}; // Save the original color
-              clickedNode.savedClassName = clickedNode.className;
-              clickedNode.color = { background: '#FFFFE0', border: '#000000' };
-              clickedNode.className = 'vis-box';
-              network.body.data.nodes.update(clickedNode);
-
-
-              // Highlight connected nodes
-              connectedNodes.forEach(connectedNodeId => {
-                if (connectedNodeId !== nodeId) {
-                  let node = network.body.data.nodes.get(connectedNodeId);
-                   if (!node.savedColor) {
-                        node.savedColor = node.color || {};
-                        node.savedClassName = node.className;
+            let correctNodeId = null;
+            if (network) {
+                network.body.data.nodes.getIds().forEach((nodeId) => {
+                    const nodeFullName = nodeId.split('@')[0];
+                    if (nodeFullName === fullName) {
+                        correctNodeId = nodeId;
                     }
-                  node.color = getNodeColorOptions(node.group, isDarkMode).color; //use getNodeColor
-                  node.className = 'vis-box' + (isDarkMode ? ' dark-mode' : ''); //set classname correctly
-                  network.body.data.nodes.update(node);
-                }
-              });
-
-              // Highlight connected edges
-              connectedEdges.forEach(edgeId => {
-                let edge = network.body.data.edges.get(edgeId);
-                edge.savedColor = edge.color || {}; // Save the original color
-                edge.color = { color: '#000000' };
-                edge.width = 3;
-                network.body.data.edges.update(edge);
-              });
+                });
+            }
+            return correctNodeId;
         }
 
         function highlightMatch(text, query) {
-            if (!query) return text;
-            const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi'); // Correctly escape the query
+            if (!query) {
+                return text;
+            }
+            const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
             return text.replace(regex, '<mark>$1</mark>');
         }
 
@@ -514,12 +719,28 @@
             return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
+        function getFamilyRoots(people) {
+            const surnames = new Set();
+            for (const [name, person] of people) {
+                if (!person.parent) {
+                    surnames.add(getSurname(name));
+                }
+            }
+            return Array.from(surnames);
+        }
+
+        function getSurname(name) {
+            return name.split(' ').pop();
+        }
+
         function stringToColor(str) {
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
                 hash = str.charCodeAt(i) + ((hash << 5) - hash);
             }
-            const color = Math.floor(Math.abs((Math.sin(hash) * 16777215) % 16777215)).toString(16);
+            const color = Math.floor(Math.abs(
+                (Math.sin(hash) * 16777215) % 16777215
+            )).toString(16);
             return '#' + Array(6 - color.length + 1).join('0') + color;
         }
 
@@ -606,6 +827,53 @@
 
             return "#" + toHex(r) + toHex(g) + toHex(b);
         }
+
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const mobileToggle = document.querySelector('.mobile-toggle');
+            
+            sidebar.classList.toggle('open');
+            mobileToggle.classList.toggle('open');
+        }
+
+        let touchStartX = 0;
+        const swipeThreshold = 50;
+
+        document.addEventListener('touchstart', e => {
+            touchStartX = e.touches[0].clientX;
+        });
+
+        document.addEventListener('touchend', e => {
+            const touchEndX = e.changedTouches[0].clientX;
+            const deltaX = touchEndX - touchStartX;
+            
+            if (Math.abs(deltaX) > swipeThreshold && window.innerWidth < 768) {
+                if (deltaX < 0) {
+                    document.querySelector('.sidebar').classList.remove('open');
+                    document.querySelector('.mobile-toggle').classList.remove('open');
+                }
+            }
+        });
+
+        function toggleLayout() {
+            layoutMode = layoutMode === 'vertical' ? 'horizontal' : 'vertical';
+            if (network) {
+                const direction = layoutMode === 'vertical' ? 'UD' : 'LR';
+                const edgeType = layoutMode === 'vertical' ? 'vertical' : 'horizontal';
+                network.setOptions({
+                    layout: {
+                        hierarchical: {
+                            direction: direction
+                        }
+                    },
+                    edges: {
+                        smooth: {
+                            type: edgeType
+                        }
+                    }
+                });
+            }
+        }
     </script>
-    </body>
+</body>
 </html>
