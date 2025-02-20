@@ -216,33 +216,55 @@ function createFamilyTrees(people, mothers) {
 }
 
 function processFamilyTree(root, people, nodes, edges, processedPairs, surname, mothers) {
-    const queue = [{ person: root, level: 0 }];
-    while (queue.length > 0) {
-        const { person, level } = queue.shift();
-        addNodeAndConnections(person, level, surname, people, nodes, edges, processedPairs, queue, mothers);
-    }
+    processNodeDFS(root, people, nodes, edges, processedPairs, surname, mothers, 0);
 }
 
-function addNodeAndConnections(person, level, surname, people, nodes, edges, processedPairs, queue, mothers) {
+function processNodeDFS(person, people, nodes, edges, processedPairs, surname, mothers, level) {
+    // Set to track processed persons to avoid infinite loops in spouse networks
+    const processedInThisChain = new Set();
+    processPersonAndSpouseNetwork(person, people, nodes, edges, processedPairs, surname, mothers, level, processedInThisChain);
+}
+
+function processPersonAndSpouseNetwork(person, people, nodes, edges, processedPairs, surname, mothers, level, processedInThisChain) {
+    if (processedInThisChain.has(person.name)) return;
+    processedInThisChain.add(person.name);
+
     const nodeId = `${person.name}@${surname}`;
     if (!nodes.some(n => n.id === nodeId)) {
         nodes.push(createNode(person, nodeId, level, surname));
     }
 
+    // Process children first
+    person.children.forEach(childName => {
+        const child = people.get(childName);
+        const childId = `${child.name}@${surname}`;
+        
+        // Check if this person is the actual father
+        const childNameParts = child.name.split(' ');
+        const isFather = childNameParts.length > 1 && childNameParts.slice(1).join(' ') === person.name;
+        
+        if (isFather) {
+            if (!nodes.some(n => n.id === childId)) {
+                nodes.push(createNode(child, childId, level + 1, surname));
+            }
+            addParentChildEdge(nodeId, childId, edges, processedPairs);
+            // Process child's subtree immediately
+            processPersonAndSpouseNetwork(child, people, nodes, edges, processedPairs, surname, mothers, level + 1, new Set());
+        }
+    });
+
+    // Process spouses after children
     person.spouses.forEach(spouseName => {
         const spouse = people.get(spouseName);
         const spouseId = `${spouse.name}@${surname}`;
+        
         if (!nodes.some(n => n.id === spouseId)) {
             nodes.push(createNode(spouse, spouseId, level, surname));
         }
         addSpouseEdge(nodeId, spouseId, edges, processedPairs);
-    });
 
-    person.children.forEach(childName => {
-        const child = people.get(childName);
-        queue.push({ person: child, level: level + 1 });
-        const childId = `${child.name}@${surname}`;
-        addParentChildEdge(nodeId, childId, edges, processedPairs, mothers.has(person.name));
+        // Process spouse's other relationships
+        processPersonAndSpouseNetwork(spouse, people, nodes, edges, processedPairs, surname, mothers, level, processedInThisChain);
     });
 }
 
@@ -282,7 +304,7 @@ function addSpouseEdge(from, to, edges, processedPairs) {
     }
 }
 
-function addParentChildEdge(from, to, edges, processedPairs, isMother) {
+function addParentChildEdge(from, to, edges, processedPairs) {
     const edgeId = `${from}->${to}`;
     if (!processedPairs.has(edgeId)) {
         edges.push({
@@ -299,28 +321,49 @@ function drawNetwork(nodes, edges) {
     const container = document.getElementById('network');
     if (network) network.destroy();
 
+    // Calculate custom positions
+    const positions = calculateCustomPositions(nodes, edges);
+    
+    // Apply positions to nodes
+    nodes.forEach(node => {
+        const pos = positions.get(node.id);
+        if (pos) {
+            node.x = pos.x;
+            node.y = pos.y;
+        }
+    });
+
     network = new vis.Network(container, { nodes, edges }, {
         layout: {
             hierarchical: {
-                enabled: true,
-                direction: layoutMode === 'vertical' ? 'UD' : 'LR',
-                sortMethod: 'directed',
-                levelSeparation: 200,
-                nodeSpacing: 200,
-                treeSpacing: 200
+                enabled: false // Disable default hierarchical layout
             }
+        },
+        physics: {
+            enabled: false // Disable physics to maintain fixed positions
         },
         edges: {
             smooth: {
-                type: layoutMode === 'vertical' ? 'vertical' : 'horizontal'
+                type: 'cubicBezier',
+                roundness: 0.5
             }
         },
-        physics: true,
         interaction: {
             dragNodes: true,
             dragView: true,
-            zoomView: true
+            zoomView: true,
+            hover: true
         }
+    });
+
+    // Fit the view after drawing
+    network.once('afterDrawing', () => {
+        network.fit({
+            animation: {
+                duration: 1000,
+                easingFunction: 'easeInOutQuad'
+            }
+        });
     });
 }
 
@@ -451,4 +494,113 @@ function getFamilyRoots(people) {
 
 function getSurname(name) {
     return name.split(' ').pop();
+}
+
+function calculateCustomPositions(nodes, edges) {
+    const levels = new Map();
+    const nodePositions = new Map();
+    const treeGroups = new Map();
+    let globalOffsetX = 0;
+    const treeSpacing = 600;
+    
+    // Group nodes by surname
+    nodes.forEach(node => {
+        const surname = node.id.split('@')[1];
+        if (!treeGroups.has(surname)) {
+            treeGroups.set(surname, []);
+        }
+        treeGroups.get(surname).push(node);
+    });
+
+    // Process each family tree
+    treeGroups.forEach((treeNodes, surname) => {
+        levels.clear();
+        const treeEdges = edges.filter(edge => 
+            edge.from.includes(`@${surname}`) || edge.to.includes(`@${surname}`));
+        
+        // First pass: Assign vertical positions (levels)
+        function assignLevels(nodeId, level = 0, processed = new Set()) {
+            if (processed.has(nodeId)) return;
+            
+            if (!levels.has(level)) {
+                levels.set(level, []);
+            }
+            levels.get(level).push(nodeId);
+            processed.add(nodeId);
+            
+            // Process children edges first
+            const childEdges = treeEdges.filter(e => 
+                !e.dashes && e.from === nodeId);
+            
+            childEdges.forEach(edge => {
+                assignLevels(edge.to, level + 1, processed);
+            });
+            
+            // Process spouse edges after children
+            const spouseEdges = treeEdges.filter(e => 
+                (e.from === nodeId || e.to === nodeId) && e.dashes);
+            
+            spouseEdges.forEach(edge => {
+                const spouseId = edge.from === nodeId ? edge.to : edge.from;
+                if (!processed.has(spouseId)) {
+                    levels.get(level).push(spouseId);
+                    processed.add(spouseId);
+                    
+                    // Process spouse's children
+                    const spouseChildEdges = treeEdges.filter(e => 
+                        !e.dashes && e.from === spouseId);
+                    spouseChildEdges.forEach(childEdge => {
+                        assignLevels(childEdge.to, level + 1, processed);
+                    });
+                }
+            });
+        }
+        
+        // Rest of the positioning code remains the same
+        const rootNodes = treeNodes
+            .filter(node => !treeEdges.some(edge => 
+                !edge.dashes && edge.to === node.id))
+            .map(node => node.id);
+        
+        rootNodes.forEach(rootId => assignLevels(rootId));
+        
+        // Calculate tree width
+        let maxLevelWidth = 0;
+        levels.forEach((nodesAtLevel) => {
+            const levelNodes = nodesAtLevel.filter(nodeId => 
+                nodeId.includes(`@${surname}`));
+            maxLevelWidth = Math.max(maxLevelWidth, levelNodes.length);
+        });
+        
+        const treeWidth = (maxLevelWidth - 1) * 200;
+        
+        // Position assignment
+        levels.forEach((nodesAtLevel, level) => {
+            const levelNodes = nodesAtLevel.filter(nodeId => 
+                nodeId.includes(`@${surname}`));
+            
+            if (levelNodes.length === 0) return;
+            
+            const totalWidth = (levelNodes.length - 1) * 200;
+            const startX = globalOffsetX + (treeWidth - totalWidth) / 2;
+            
+            levelNodes.forEach((nodeId, index) => {
+                nodePositions.set(nodeId, {
+                    y: level * 300,
+                    x: startX + (index * 200)
+                });
+            });
+        });
+        
+        globalOffsetX += treeWidth + treeSpacing;
+    });
+
+    // Center all trees
+    const totalWidth = globalOffsetX - treeSpacing;
+    const centerOffset = -totalWidth / 2;
+    nodePositions.forEach((pos) => {
+        pos.x += centerOffset;
+    });
+
+    return nodePositions;
 }
