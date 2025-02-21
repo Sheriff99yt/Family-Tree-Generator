@@ -97,8 +97,9 @@ body {
 .controls {
     display: flex;
     gap: 0.5rem;
-    flex-direction: column;
+    flex-direction: row; /* changed from column to row for side-by-side buttons */
     margin-top: 1rem;
+    align-items: center;
 }
 
 button {
@@ -118,6 +119,9 @@ button {
 
 button.secondary {
     background-color: var(--secondary);
+    width: 48px; /* square size */
+    height: 48px;
+    padding: 0;
 }
 
 button:hover {
@@ -222,6 +226,31 @@ textarea {
     height: 100vh;
     background: var(--background);
     touch-action: pan-x pan-y;
+}
+
+.spacing-sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.spacing-sliders label {
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.spacing-sliders input[type="range"] {
+    width: 100%;
+}
+
+.full-width {
+    width: 100%;
+}
+
+/* Adjust textarea height to half its original size */
+.half-size {
+    height: 115px; /* Originally 230px */
 }
 
 @media (min-width: 768px) {

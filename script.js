@@ -2,7 +2,8 @@ let peopleData = new Map();
 let isDarkMode = true;
 let network;
 let fuse;
-let layoutMode = 'vertical';
+let layoutModeIndex = 0;
+const layoutModes = ["up-to-down", "down-to-up", "left-to-right", "right-to-left"];
 
 function toggleDarkMode() {
     isDarkMode = !isDarkMode;
@@ -50,6 +51,18 @@ function generateTree() {
         shouldSort: true,
     });
     setupSearch();
+
+    // Retract the panel after generating the tree:
+    const sidebar = document.querySelector('.sidebar');
+    const mobileToggle = document.querySelector('.mobile-toggle');
+    sidebar.classList.remove('open');
+    mobileToggle.classList.remove('open');
+
+    // Update edge smoothing based on current layout mode
+    updateEdgeSmoothing();
+
+    // Apply the last selected layout rotation
+    applyLayoutRotation();
 }
 
 function toggleSidebar() {
@@ -80,24 +93,50 @@ document.addEventListener('touchend', e => {
     }
 });
 
+// Updated toggleLayout function to update edge smoothing based on layout mode
 function toggleLayout() {
-    layoutMode = layoutMode === 'vertical' ? 'horizontal' : 'vertical';
-    if (network) {
-        const direction = layoutMode === 'vertical' ? 'UD' : 'LR';
-        const edgeType = layoutMode === 'vertical' ? 'vertical' : 'horizontal';
-        network.setOptions({
-            layout: {
-                hierarchical: {
-                    direction: direction
-                }
-            },
-            edges: {
-                smooth: {
-                    type: edgeType
-                }
-            }
-        });
+    // Cycle mode
+    layoutModeIndex = (layoutModeIndex + 1) % layoutModes.length;
+    const mode = layoutModes[layoutModeIndex];
+    
+    // Determine rotation angle in radians
+    let angle = 0;
+    if (mode === "up-to-down") {
+        angle = 0;
+    } else if (mode === "down-to-up") {
+        angle = Math.PI;
+    } else if (mode === "left-to-right") {
+        angle = Math.PI / 2;
+    } else if (mode === "right-to-left") {
+        angle = -Math.PI / 2;
     }
+    
+    // Set edge smoothing type based on vertical or horizontal layout
+    const edgeType = (mode === "up-to-down" || mode === "down-to-up") ? "vertical" : "horizontal";
+    network.setOptions({ edges: { smooth: { type: edgeType, roundness: 0.5 } } });
+    
+    // Recalculate original positions using calculateCustomPositions
+    const positions = calculateCustomPositions(network.body.data.nodes.get(), network.body.data.edges.get());
+    
+    // Apply rotation to each position
+    const rotatedPositions = new Map();
+    let xs = [];
+    positions.forEach((pos, id) => {
+        const newX = pos.x * Math.cos(angle) - pos.y * Math.sin(angle);
+        const newY = pos.x * Math.sin(angle) + pos.y * Math.cos(angle);
+        rotatedPositions.set(id, { x: newX, y: newY });
+        xs.push(newX);
+    });
+    // Recenter horizontally based on rotated positions
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const centerOffset = -((minX + maxX) / 2);
+    rotatedPositions.forEach(pos => { pos.x += centerOffset; });
+    
+    // Update positions in the network
+    network.body.data.nodes.update(
+        Array.from(rotatedPositions.entries()).map(([id, pos]) => ({ id, x: pos.x, y: pos.y }))
+    );
 }
 
 function clearAll() {
@@ -497,110 +536,159 @@ function getSurname(name) {
 }
 
 function calculateCustomPositions(nodes, edges) {
-    const levels = new Map();
     const nodePositions = new Map();
-    const treeGroups = new Map();
-    let globalOffsetX = 0;
-    const treeSpacing = 600;
-    
-    // Group nodes by surname
-    nodes.forEach(node => {
-        const surname = node.id.split('@')[1];
-        if (!treeGroups.has(surname)) {
-            treeGroups.set(surname, []);
-        }
-        treeGroups.get(surname).push(node);
+    const baseWidth = 100; // minimum width for a group
+
+    // Get spacing values from sliders (vertical from slider; horizontal remains for sibling spacing)
+    const verticalSpacing = parseInt(document.getElementById("verticalSpacing").value) || 150;
+    const horizontalGap = parseInt(document.getElementById("horizontalSpacing").value) || 50;
+
+    // Build union-find for spouse groups based on dashed edges
+    const parentUF = {};
+    function find(x) {
+        if (parentUF[x] === undefined) { parentUF[x] = x; return x; }
+        if (parentUF[x] !== x) { parentUF[x] = find(parentUF[x]); }
+        return parentUF[x];
+    }
+    function union(x, y) {
+        const rx = find(x), ry = find(y);
+        if (rx !== ry) parentUF[ry] = rx;
+    }
+    nodes.forEach(n => find(n.id));
+    edges.forEach(edge => { if (edge.dashes) { union(edge.from, edge.to); } });
+    const repMap = {};
+    nodes.forEach(n => { repMap[n.id] = find(n.id); });
+    const groupNodes = new Map();
+    nodes.forEach(n => {
+        const rep = repMap[n.id];
+        if (!groupNodes.has(rep)) groupNodes.set(rep, []);
+        groupNodes.get(rep).push(n.id);
     });
 
-    // Process each family tree
-    treeGroups.forEach((treeNodes, surname) => {
-        levels.clear();
-        const treeEdges = edges.filter(edge => 
-            edge.from.includes(`@${surname}`) || edge.to.includes(`@${surname}`));
-        
-        // First pass: Assign vertical positions (levels)
-        function assignLevels(nodeId, level = 0, processed = new Set()) {
-            if (processed.has(nodeId)) return;
-            
-            if (!levels.has(level)) {
-                levels.set(level, []);
+    // Build parent-child mapping using spouse groups (from non-dashed edges)
+    const parentChildMap = new Map();
+    const allChildReps = new Set();
+    edges.forEach(edge => {
+        if (!edge.dashes) {
+            const pRep = repMap[edge.from], cRep = repMap[edge.to];
+            if (pRep === cRep) return;
+            if (!parentChildMap.has(pRep)) parentChildMap.set(pRep, new Set());
+            parentChildMap.get(pRep).add(cRep);
+            allChildReps.add(cRep);
+        }
+    });
+    const rootGroups = [];
+    groupNodes.forEach((_, rep) => { if (!allChildReps.has(rep)) { rootGroups.push(rep); } });
+
+    // First pass: recursively compute subtree widths for each spouse group
+    const subtreeWidths = new Map();
+    function computeSubtreeWidth(groupRep) {
+        if (!parentChildMap.has(groupRep)) {
+            subtreeWidths.set(groupRep, baseWidth);
+            return baseWidth;
+        }
+        const children = Array.from(parentChildMap.get(groupRep));
+        let total = 0;
+        children.forEach((childRep, idx) => {
+            const childWidth = computeSubtreeWidth(childRep);
+            total += childWidth;
+            if (idx < children.length - 1) total += horizontalGap;
+        });
+        const width = Math.max(baseWidth, total);
+        subtreeWidths.set(groupRep, width);
+        return width;
+    }
+    rootGroups.forEach(rep => computeSubtreeWidth(rep));
+
+    // Second pass: recursively assign positions for each spouse group with custom spouse offset logic
+    function assignPositions(groupRep, xStart, level) {
+        const width = subtreeWidths.get(groupRep);
+        const baseX = xStart + width / 2;  // base center for this group
+        const group = groupNodes.get(groupRep);
+        let main = group[0];
+        for (let i = 0; i < group.length; i++) {
+            let hasChild = false;
+            edges.forEach(edge => { if (!edge.dashes && edge.from === group[i]) { hasChild = true; } });
+            if (hasChild) { main = group[i]; break; }
+        }
+        nodePositions.set(main, { x: baseX, y: level * verticalSpacing });
+        group.forEach(nodeId => {
+            if (nodeId === main) return;
+            let hasChild = false;
+            edges.forEach(edge => { if (!edge.dashes && edge.from === nodeId) { hasChild = true; } });
+            const nodeObj = nodes.find(n => n.id === nodeId);
+            const labelWidth = nodeObj ? (nodeObj.label.length * 8) : 80;
+            // Multiply labelWidth by 1.5 for spouse spacing
+            if (!hasChild) {
+                nodePositions.set(nodeId, { x: baseX + labelWidth * 1.5, y: level * verticalSpacing });
+            } else {
+                let mainPos = nodePositions.get(main);
+                mainPos.x -= (labelWidth * 1.5) / 2;
+                nodePositions.set(main, mainPos);
+                nodePositions.set(nodeId, { x: mainPos.x + (labelWidth * 1.5), y: level * verticalSpacing });
             }
-            levels.get(level).push(nodeId);
-            processed.add(nodeId);
-            
-            // Process children edges first
-            const childEdges = treeEdges.filter(e => 
-                !e.dashes && e.from === nodeId);
-            
-            childEdges.forEach(edge => {
-                assignLevels(edge.to, level + 1, processed);
-            });
-            
-            // Process spouse edges after children
-            const spouseEdges = treeEdges.filter(e => 
-                (e.from === nodeId || e.to === nodeId) && e.dashes);
-            
-            spouseEdges.forEach(edge => {
-                const spouseId = edge.from === nodeId ? edge.to : edge.from;
-                if (!processed.has(spouseId)) {
-                    levels.get(level).push(spouseId);
-                    processed.add(spouseId);
-                    
-                    // Process spouse's children
-                    const spouseChildEdges = treeEdges.filter(e => 
-                        !e.dashes && e.from === spouseId);
-                    spouseChildEdges.forEach(childEdge => {
-                        assignLevels(childEdge.to, level + 1, processed);
-                    });
-                }
+        });
+        if (parentChildMap.has(groupRep)) {
+            const children = Array.from(parentChildMap.get(groupRep));
+            let currentX = xStart;
+            children.forEach(childRep => {
+                const childWidth = subtreeWidths.get(childRep);
+                assignPositions(childRep, currentX, level + 1);
+                currentX += childWidth + horizontalGap;
             });
         }
-        
-        // Rest of the positioning code remains the same
-        const rootNodes = treeNodes
-            .filter(node => !treeEdges.some(edge => 
-                !edge.dashes && edge.to === node.id))
-            .map(node => node.id);
-        
-        rootNodes.forEach(rootId => assignLevels(rootId));
-        
-        // Calculate tree width
-        let maxLevelWidth = 0;
-        levels.forEach((nodesAtLevel) => {
-            const levelNodes = nodesAtLevel.filter(nodeId => 
-                nodeId.includes(`@${surname}`));
-            maxLevelWidth = Math.max(maxLevelWidth, levelNodes.length);
-        });
-        
-        const treeWidth = (maxLevelWidth - 1) * 200;
-        
-        // Position assignment
-        levels.forEach((nodesAtLevel, level) => {
-            const levelNodes = nodesAtLevel.filter(nodeId => 
-                nodeId.includes(`@${surname}`));
-            
-            if (levelNodes.length === 0) return;
-            
-            const totalWidth = (levelNodes.length - 1) * 200;
-            const startX = globalOffsetX + (treeWidth - totalWidth) / 2;
-            
-            levelNodes.forEach((nodeId, index) => {
-                nodePositions.set(nodeId, {
-                    y: level * 300,
-                    x: startX + (index * 200)
-                });
-            });
-        });
-        
-        globalOffsetX += treeWidth + treeSpacing;
+    }
+    let globalOffsetX = 0;
+    // Use fixed 200 pixel gap between tree clusters instead of the slider value
+    rootGroups.forEach(rep => {
+        const treeWidth = subtreeWidths.get(rep);
+        assignPositions(rep, globalOffsetX, 0);
+        globalOffsetX += treeWidth + 200; // fixed 200 pixel gap between trees
     });
-
-    // Center all trees
-    const totalWidth = globalOffsetX - treeSpacing;
+    const totalWidth = globalOffsetX - 200; // subtract final fixed gap
     const centerOffset = -totalWidth / 2;
-    nodePositions.forEach((pos) => {
-        pos.x += centerOffset;
-    });
-
+    nodePositions.forEach(pos => { pos.x += centerOffset; });
     return nodePositions;
+}
+
+// New function to apply rotation based on the last selected layout mode
+function applyLayoutRotation() {
+    const mode = layoutModes[layoutModeIndex];
+    let angle = 0;
+    if (mode === "up-to-down") {
+        angle = 0;
+    } else if (mode === "down-to-up") {
+        angle = Math.PI;
+    } else if (mode === "left-to-right") {
+        angle = Math.PI / 2;
+    } else if (mode === "right-to-left") {
+        angle = -Math.PI / 2;
+    }
+    
+    // Get the current positions from network and recalculate rotated positions
+    const positions = calculateCustomPositions(network.body.data.nodes.get(), network.body.data.edges.get());
+    const rotatedPositions = new Map();
+    let xs = [];
+    positions.forEach((pos, id) => {
+        const newX = pos.x * Math.cos(angle) - pos.y * Math.sin(angle);
+        const newY = pos.x * Math.sin(angle) + pos.y * Math.cos(angle);
+        rotatedPositions.set(id, { x: newX, y: newY });
+        xs.push(newX);
+    });
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const centerOffset = -((minX + maxX) / 2);
+    rotatedPositions.forEach(pos => { pos.x += centerOffset; });
+    
+    // Update positions in the network
+    network.body.data.nodes.update(
+        Array.from(rotatedPositions.entries()).map(([id, pos]) => ({ id, x: pos.x, y: pos.y }))
+    );
+}
+
+// New helper function to update edge smoothing
+function updateEdgeSmoothing() {
+    const mode = layoutModes[layoutModeIndex];
+    const edgeType = (mode === "up-to-down" || mode === "down-to-up") ? "vertical" : "horizontal";
+    network.setOptions({ edges: { smooth: { type: edgeType, roundness: 0.5 } } });
 }

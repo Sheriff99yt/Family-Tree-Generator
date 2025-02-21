@@ -22,10 +22,19 @@
         </div>
         
         <div class="input-container">
-            <textarea id="input" placeholder="Enter family data here"></textarea>
+            <textarea id="input" class="half-size" placeholder="Enter family data here"></textarea>
             <div class="controls">
-                <button onclick="generateTree()">Generate</button>
+                <button class="full-width" onclick="generateTree()">Generate</button>
                 <button class="secondary" onclick="clearAll()">Clear</button>
+            </div>
+            <!-- New spacing sliders below the buttons -->
+            <div class="spacing-sliders">
+                <label>Vertical Spacing:
+                    <input type="range" id="verticalSpacing" min="50" max="300" value="150">
+                </label>
+                <label>Horizontal Spacing:
+                    <input type="range" id="horizontalSpacing" min="20" max="150" value="50">
+                </label>
             </div>
         </div>
     </div>
