@@ -1,23 +1,23 @@
 :root {
-    --primary: #6366f1;
-    --primary-hover: #4f46e5;
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
     --secondary: #64748b;
     --secondary-hover: #475569;
-    --background: #ffffff;
+    --background: #f8fafc;
     --text: #1e293b;
     --border: #e2e8f0;
-    --card-bg: #f8fafc;
+    --card-bg: #ffffff;
     --node-bg: #f1f5f9;
 }
 
 .dark-mode {
-    --primary: #818cf8;
-    --primary-hover: #6366f1;
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
     --secondary: #94a3b8;
-    --secondary-hover: #7c8ba1;
+    --secondary-hover: #64748b;
     --background: #0f172a;
-    --text: #f8fafc;
-    --border: #334155;
+    --text: #e2e8f0;
+    --border: #1e293b;
     --card-bg: #1e293b;
     --node-bg: #334155;
 }

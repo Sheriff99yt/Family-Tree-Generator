@@ -11,8 +11,26 @@ function toggleDarkMode() {
     if (network) network.redraw();
 }
 
-function generateTree() {
-    const input = document.getElementById('input').value.trim();
+// Updated generateTree to support Google Sheets link input
+async function generateTree() {
+    let rawInput = document.getElementById('input').value.trim();
+    let input;
+    // Check if the input is a Google Sheets URL
+    if (rawInput.startsWith("http") && rawInput.includes("docs.google.com")) {
+        const csvUrl = convertSheetUrlToCsvUrl(rawInput);
+        try {
+            const csvData = await fetch(csvUrl).then(res => res.text());
+            const names = parseCsvForFullNames(csvData);
+            input = names.join("\n");
+        } catch (e) {
+            alert("Failed to fetch Google Sheet data");
+            return;
+        }
+    } else {
+        input = rawInput;
+    }
+    
+    // Start processing tree with the (possibly modified) input
     peopleData.clear();
     const spouseRelations = new Set();
     const mothers = new Set();
@@ -65,6 +83,36 @@ function generateTree() {
     applyLayoutRotation();
 }
 
+// Helper function: Convert Google Sheets URL to CSV export URL
+function convertSheetUrlToCsvUrl(url) {
+    // Example link: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit#gid=SHEET_ID
+    const sheetIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    const gidMatch = url.match(/gid=(\d+)/);
+    if (!sheetIdMatch) return url;
+    const spreadsheetId = sheetIdMatch[1];
+    const gid = gidMatch ? gidMatch[1] : '0';
+    return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&id=${spreadsheetId}&gid=${gid}`;
+}
+
+// Helper function: Parse CSV and extract names from the "Full Names" column
+function parseCsvForFullNames(csvText) {
+    const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
+    if (lines.length === 0) return [];
+    const headers = lines[0].split(',');
+    console.log("CSV Headers:", headers);
+    const targetIndex = headers.findIndex(h => h.trim().toLowerCase() === "full names");
+    console.log("Target index for 'Full Names':", targetIndex);
+    if (targetIndex === -1) return [];
+    const names = [];
+    for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',');
+        if (cols[targetIndex]) {
+            names.push(cols[targetIndex].trim());
+        }
+    }
+    return names;
+}
+
 function toggleSidebar() {
     const sidebar = document.querySelector('.sidebar');
     const mobileToggle = document.querySelector('.mobile-toggle');
@@ -111,8 +159,8 @@ function toggleLayout() {
         angle = -Math.PI / 2;
     }
     
-    // Set edge smoothing type based on vertical or horizontal layout
-    const edgeType = (mode === "up-to-down" || mode === "down-to-up") ? "vertical" : "horizontal";
+    // Swap edge smoothing: use "horizontal" for vertical modes and vice-versa
+    const edgeType = (mode === "up-to-down" || mode === "down-to-up") ? "horizontal" : "vertical";
     network.setOptions({ edges: { smooth: { type: edgeType, roundness: 0.5 } } });
     
     // Recalculate original positions using calculateCustomPositions
@@ -307,24 +355,44 @@ function processPersonAndSpouseNetwork(person, people, nodes, edges, processedPa
     });
 }
 
-function createNode(person, nodeId, level, group) {
-    const baseColor = stringToColor(group);
-    const desaturatedColor = desaturateColor(baseColor, 70);
+function generateFamilyColor(surname) {
+    let hash = 0;
+    for (let i = 0; i < surname.length; i++) {
+        hash = surname.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = hash % 360;
+    // Use pastel colors with better contrast
+    return `hsl(${hue}, 55%, 65%)`;
+}
+
+function createNode(person, nodeId, level, surname) {
+    const familyColor = generateFamilyColor(surname);
+    const textColor = '#1a1a1a'; // Dark gray text for better readability
     return {
         id: nodeId,
         label: person.displayName,
         level: level,
-        group: group,
+        color: {
+            background: familyColor,
+            border: familyColor,
+            highlight: {
+                background: familyColor,
+                border: `hsl(${familyColor.match(/\d+/)[0]}, 65%, 55%)`, // Slightly darker on highlight
+            }
+        },
+        font: {
+            color: textColor,
+            size: 14,
+            face: 'Inter'
+        },
         shape: 'box',
         margin: 10,
-        font: { size: 14 },
-        color: {
-            background: desaturatedColor,
-            border: darkenColor(desaturatedColor, 20),
-            highlight: {
-                background: '#FFFF00',
-                border: '#000000'
-            }
+        shadow: {
+            enabled: true,
+            color: 'rgba(0,0,0,0.2)',
+            size: 3,
+            x: 1,
+            y: 1
         }
     };
 }
@@ -332,10 +400,12 @@ function createNode(person, nodeId, level, group) {
 function addSpouseEdge(from, to, edges, processedPairs) {
     const edgePair = [from, to].sort().join('+');
     if (!processedPairs.has(edgePair)) {
+        const surname = from.split('@')[1]; // Get surname from nodeId
+        const familyColor = generateFamilyColor(surname);
         edges.push({
             from: from,
             to: to,
-            color: '#FF0000',
+            color: familyColor,
             dashes: true,
             width: 2
         });
@@ -346,11 +416,13 @@ function addSpouseEdge(from, to, edges, processedPairs) {
 function addParentChildEdge(from, to, edges, processedPairs) {
     const edgeId = `${from}->${to}`;
     if (!processedPairs.has(edgeId)) {
+        const surname = from.split('@')[1]; // Get surname from nodeId
+        const familyColor = generateFamilyColor(surname);
         edges.push({
             from: from,
             to: to,
             arrows: 'to',
-            color: '#2B7CE9'
+            color: familyColor
         });
         processedPairs.add(edgeId);
     }
@@ -472,57 +544,6 @@ function handleSearchResultClick(name) {
 }
 
 // Utility functions
-function stringToColor(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    // Make sure we have a positive number and use only the last 6 digits
-    const positiveHash = Math.abs(hash) % 16777215; // 16777215 is FFFFFF in decimal
-    const color = positiveHash.toString(16);
-    // Pad with leading zeros if needed
-    return '#' + '0'.repeat(Math.max(0, 6 - color.length)) + color;
-}
-
-function desaturateColor(hexColor, percentage) {
-    const rgb = hexToRgb(hexColor);
-    const gray = (rgb.r + rgb.g + rgb.b) / 3;
-    const factor = percentage / 100;
-    
-    return rgbToHex({
-        r: Math.round(rgb.r + (gray - rgb.r) * factor),
-        g: Math.round(rgb.g + (gray - rgb.g) * factor),
-        b: Math.round(rgb.b + (gray - rgb.b) * factor)
-    });
-}
-
-function darkenColor(hexColor, percentage) {
-    const rgb = hexToRgb(hexColor);
-    const factor = (100 - percentage) / 100;
-    
-    return rgbToHex({
-        r: Math.round(rgb.r * factor),
-        g: Math.round(rgb.g * factor),
-        b: Math.round(rgb.b * factor)
-    });
-}
-
-function hexToRgb(hex) {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
-    } : null;
-}
-
-function rgbToHex({ r, g, b }) {
-    return '#' + [r, g, b].map(x => {
-        const hex = x.toString(16);
-        return hex.length === 1 ? '0' + hex : hex;
-    }).join('');
-}
-
 function getFamilyRoots(people) {
     const surnames = new Set();
     for (const [name] of people) {
@@ -540,7 +561,7 @@ function calculateCustomPositions(nodes, edges) {
     const baseWidth = 100; // minimum width for a group
 
     // Get spacing values from sliders (vertical from slider; horizontal remains for sibling spacing)
-    const verticalSpacing = parseInt(document.getElementById("verticalSpacing").value) || 150;
+    const verticalSpacing = parseInt(document.getElementById("verticalSpacing").value) || 300;
     const horizontalGap = parseInt(document.getElementById("horizontalSpacing").value) || 50;
 
     // Build union-find for spouse groups based on dashed edges
@@ -689,6 +710,7 @@ function applyLayoutRotation() {
 // New helper function to update edge smoothing
 function updateEdgeSmoothing() {
     const mode = layoutModes[layoutModeIndex];
-    const edgeType = (mode === "up-to-down" || mode === "down-to-up") ? "vertical" : "horizontal";
+    // Swap edge smoothing: use "horizontal" for vertical modes and vice-versa
+    const edgeType = (mode === "up-to-down" || mode === "down-to-up") ? "horizontal" : "vertical";
     network.setOptions({ edges: { smooth: { type: edgeType, roundness: 0.5 } } });
 }

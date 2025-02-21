@@ -1,4 +1,43 @@
-# Family Tree Generator Documentation
+# Family Tree Generator
+
+## How to Use
+
+### Step 1: Input Your Family Data
+Enter family relationships in the text box using either of these formats:
+
+1. **Parent-Child Format** (child name must contain parent's full name):
+```
+# Parent-child relationships (one per line):
+John Smith
+Jane Smith
+Mike John Smith
+Sarah John Smith
+```
+
+2. **Marriage Format** (using + symbol):
+```
+# Marriage relationships (using + symbol):
+John Smith + Mary Jones
+```
+
+### Step 2: Follow Naming Conventions
+The names follow this pattern:
+- For a basic person: `First Last`
+- For a child: `First Parent's_Full_Name`
+- For marriages: `Person1 + Person2`
+
+### Step 3: Use Google Sheets Link (Optional)
+You can also paste a Google Sheets link containing a "Full Names" column with the family data.
+
+### Step 4: Generate the Family Tree
+Click the "Generate" button to create your family tree.
+
+### Step 5: Additional Controls
+- Use the search box to find family members
+- Adjust vertical/horizontal spacing using the sliders
+- Toggle dark/light mode with the moon icon
+- Fit the view to screen with the expand icon
+- Change tree direction with the arrows icon
 
 ## Overview
 A vanilla JavaScript/HTML solution for generating family trees from structured text input. Handles complex Arabic naming conventions and relationships, producing formatted tree visualizations with proper Unicode hierarchy symbols.
@@ -22,19 +61,34 @@ A vanilla JavaScript/HTML solution for generating family trees from structured t
 ## Technical Specifications
 | Category            | Details                                                                 |
 |---------------------|-------------------------------------------------------------------------|
-| Language            | Vanilla JavaScript (ES6+) + HTML5                                      |
-| Data Structures     | `Map()` for O(1) lookups, `Set()` for unique relationships             |
-| Unicode Symbols     | └──, ├──, │ for hierarchy visualization                                |
-| Performance         | Optimized for O(n) complexity with recursive tree building             |
-| Compatibility       | Modern browsers (Chrome, Firefox, Safari, Edge)                        |
+| Language            | Vanilla JavaScript (ES6+) + HTML5 + CSS3                               |
+| Visualization       | vis.js Network for interactive tree display                            |
+| Search             | Fuse.js for fuzzy name searching                                       |
+| Layout             | Custom positioning algorithm with dynamic spacing                       |
+| UI Framework       | Pure CSS with CSS Variables for theming                                |
 
 ## Code Structure
 
-### HTML Components
-```html
-<textarea id="input">...</textarea>      <!-- Input field -->
-<button onclick="generateTree()">...</button>  <!-- Generate button -->
-<pre id="output"></pre>                 <!-- Tree visualization -->
+### Core Components
+1. **Network Visualization**
+   - Uses vis.js Network for interactive graph display
+   - Custom node positioning algorithm
+   - Four-way layout rotation (up, down, left, right)
+
+2. **Data Management**
+   - Person objects with bidirectional relationships
+   - Automatic spouse network detection
+   - Dynamic tree restructuring
+
+3. **User Interface**
+   - Responsive sidebar with mobile support
+   - Real-time search with Fuse.js
+   - Dynamic spacing controls
+   - Dark/Light theme switching
+
+### Key Functions
+
+#### Tree Generation
 ```
 
 ### JavaScript Functions
@@ -180,7 +234,48 @@ Family Tree: خالد
 # Expanded Family Tree Generator Documentation
 
 ## Architecture Overview
+
+The system follows a modular pipeline architecture:
+
+### Component Flow
 ![System Architecture Diagram](Architecture%20Overview.svg)
+
+1. **Input-FamilyData**
+   - Text input processor
+   - Google Sheets link handler
+   - Input validation & sanitization
+
+2. **ParsingModule**
+   - Name tokenization
+   - Relationship extraction
+   - Ancestry chain builder
+   - Error detection
+
+3. **Data_Structures**
+   - Person object store
+   - Relationship matrices
+   - Family grouping
+   - Validation rules
+
+4. **TreeBuilder**
+   - Hierarchy construction
+   - Position calculation
+   - Layout optimization
+   - Node placement
+
+5. **VisualizationEngine**
+   - Interactive graph rendering
+   - Event handling
+   - Animation management
+   - View controls
+
+6. **OutputRenderer**
+   - Visual styling
+   - Theme management
+   - Responsive display
+   - Export options
+
+### Data Flow
 
 ## In-Depth Implementation Guide
 
@@ -407,13 +502,3 @@ function registerHook(hookName, callback) {
 ```
 
 ---
-
-## License
-MIT License - Free for modification and redistribution
-
----
-
-This documentation provides complete implementation details while maintaining focus on the unique requirements of Arabic name handling and complex family relationships. The code structure and algorithms are optimized for clarity and performance.
-
-
-
