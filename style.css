@@ -253,7 +253,7 @@ textarea {
     height: 115px; /* Originally 230px */
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1000px) {
     .sidebar {
         width: 320px;
         transform: translateX(0);
