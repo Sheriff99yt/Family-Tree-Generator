@@ -840,16 +840,31 @@ function showDetailsPanel(nodeId) {
     const person = peopleData.get(nodeId);
     if (!person) return;
 
-    // Update details panel content and make full name clickable
-    const fullNameSpan = document.getElementById('full-name');
-    
-    // Create clickable root name element
-    const rootNameSpan = document.getElementById('root-name');
-    rootNameSpan.textContent = person.rootName || 'N/A';
-    rootNameSpan.style.cursor = 'pointer';
-    rootNameSpan.style.color = 'var(--primary)';
-    rootNameSpan.style.textDecoration = 'underline';
-    rootNameSpan.onclick = () => {
+    // Get all required DOM elements
+    const elements = {
+        rootName: document.getElementById('root-name'),
+        birthDate: document.getElementById('birth-date'),
+        age: document.getElementById('age'),
+        endDate: document.getElementById('end-date'),
+        personImg: document.getElementById('person-image'),
+        personName: document.getElementById('person-name'),
+        detailsPanel: document.getElementById('details-panel')
+    };
+
+    // Check if all elements exist
+    for (const element of Object.values(elements)) {
+        if (!element) {
+            console.error('Missing required DOM element in details panel');
+            return;
+        }
+    }
+
+    // Update root name
+    elements.rootName.textContent = person.rootName || 'N/A';
+    elements.rootName.style.cursor = 'pointer';
+    elements.rootName.style.color = 'var(--primary)';
+    elements.rootName.style.textDecoration = 'underline';
+    elements.rootName.onclick = () => {
         if (person.rootName) {
             const rootNodeId = findNodeIdByName(person.rootName);
             if (rootNodeId) {
@@ -865,21 +880,26 @@ function showDetailsPanel(nodeId) {
         }
     };
 
-    document.getElementById('birth-date').textContent = person.birthDate || 'N/A';
-    document.getElementById('age').textContent = calculateAge(person.birthDate, person.endDate);
-    document.getElementById('end-date').textContent = person.endDate || 'N/A';
+    // Update person details
+    elements.birthDate.textContent = person.birthDate || 'N/A';
+    elements.age.textContent = calculateAge(person.birthDate, person.endDate);
+    elements.endDate.textContent = person.endDate || 'N/A';
 
-    // Handle person image and name
-    const personImgContainer = document.querySelector('.image-container');
-    const personImg = document.getElementById('person-image');
-    const personNameSpan = document.getElementById('person-name');
-    personImgContainer.style.display = 'block';
+    // Update person image and name
+    if (person.picture) {
+        elements.personImg.src = person.picture;
+        elements.personImg.onerror = () => {
+            elements.personImg.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+        };
+    } else {
+        elements.personImg.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+    }
 
-    personNameSpan.textContent = person.name || 'N/A';
-    personNameSpan.style.cursor = 'pointer';
-    personNameSpan.style.color = 'var(--primary)';
-    personNameSpan.style.textDecoration = 'underline';
-    personNameSpan.onclick = () => {
+    elements.personName.textContent = person.name || 'N/A';
+    elements.personName.style.cursor = 'pointer';
+    elements.personName.style.color = 'var(--primary)';
+
+    elements.personName.onclick = () => {
         const personNodeId = findNodeIdByName(person.name);
         if (personNodeId) {
             network.focus(personNodeId, {
@@ -893,19 +913,8 @@ function showDetailsPanel(nodeId) {
         }
     };
 
-    if (person.picture) {
-        personImg.src = person.picture;
-        personImg.onerror = () => {
-            personImg.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-        };
-    } else {
-        personImg.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-    }
-
     // Show the panel
-    document.getElementById('details-panel').classList.add('open');
-
-    document.getElementById('person-name').textContent = person.name || 'N/A';
+    elements.detailsPanel.classList.add('open');
 }
 
 function closeDetailsPanel() {
