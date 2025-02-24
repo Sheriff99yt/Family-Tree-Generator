@@ -16,13 +16,25 @@ function toggleDarkMode() {
 async function generateTree() {
     let rawInput = document.getElementById('input').value.trim();
     let input;
-    // Check if the input is a Google Sheets URL
+    let additionalData = new Map();
+
+    // Handle Google Sheets input
     if (rawInput.startsWith("http") && rawInput.includes("docs.google.com")) {
         const csvUrl = convertSheetUrlToCsvUrl(rawInput);
         try {
             const csvData = await fetch(csvUrl).then(res => res.text());
-            const names = parseCsvForFullNames(csvData);
-            input = names.join("\n");
+            const parsedData = parseCsvForFullNames(csvData);
+            input = parsedData.map(p => p.name).join("\n");
+            
+            // Store additional data in the Map
+            parsedData.forEach(person => {
+                additionalData.set(person.name, {
+                    birthDate: person.birthDate,
+                    endDate: person.endDate,
+                    picture: person.picture
+                    // Don't store rootName from spreadsheet as we'll calculate it
+                });
+            });
         } catch (e) {
             alert("Failed to fetch Google Sheet data");
             return;
@@ -45,6 +57,17 @@ async function generateTree() {
             processSpouses(peopleData, spouseRelations, left, right, mothers);
         } else {
             processChild(peopleData, line, mothers);
+        }
+    });
+
+    // Add the additional data to the peopleData entries
+    additionalData.forEach((data, name) => {
+        if (peopleData.has(name)) {
+            const person = peopleData.get(name);
+            person.birthDate = data.birthDate;
+            person.endDate = data.endDate;
+            person.picture = data.picture;
+            // Root name is already set by buildAncestryChain
         }
     });
 
@@ -99,19 +122,33 @@ function convertSheetUrlToCsvUrl(url) {
 function parseCsvForFullNames(csvText) {
     const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
     if (lines.length === 0) return [];
-    const headers = lines[0].split(',');
-    console.log("CSV Headers:", headers);
-    const targetIndex = headers.findIndex(h => h.trim().toLowerCase() === "full names");
-    console.log("Target index for 'Full Names':", targetIndex);
-    if (targetIndex === -1) return [];
-    const names = [];
+    
+    // Parse headers and find required column indices
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const columnIndices = {
+        fullName: headers.findIndex(h => h === "full names"),
+        birthDate: headers.findIndex(h => h === "birth date"),
+        endDate: headers.findIndex(h => h === "end date"),
+        picture: headers.findIndex(h => h === "person picture"),
+        rootName: headers.findIndex(h => h === "root name")
+    };
+
+    // Process each line
+    const peopleData = [];
     for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',');
-        if (cols[targetIndex]) {
-            names.push(cols[targetIndex].trim());
+        const cols = lines[i].split(',').map(col => col.trim());
+        if (cols[columnIndices.fullName]) {
+            const person = {
+                name: cols[columnIndices.fullName],
+                birthDate: columnIndices.birthDate >= 0 ? cols[columnIndices.birthDate] : null,
+                endDate: columnIndices.endDate >= 0 ? cols[columnIndices.endDate] : null,
+                picture: null, // We can't get embedded images from CSV
+                rootName: columnIndices.rootName >= 0 ? cols[columnIndices.rootName] : null
+            };
+            peopleData.push(person);
         }
     }
-    return names;
+    return peopleData;
 }
 
 function toggleSidebar() {
@@ -238,6 +275,8 @@ function addPersonWithAncestry(people, name) {
 
 function buildAncestryChain(people, name) {
     let current = name;
+    let rootName = name; // Track the root ancestor
+
     while (true) {
         const parentName = extractParentName(current);
         if (!parentName) break;
@@ -249,7 +288,12 @@ function buildAncestryChain(people, name) {
 
         linkParentChild(people, parentName, current);
         current = parentName;
+        rootName = parentName; // Update root name to the current ancestor
     }
+
+    // Set the root name for the original person
+    const person = people.get(name);
+    person.rootName = rootName;
 }
 
 function createPerson(name, displayName) {
@@ -259,7 +303,8 @@ function createPerson(name, displayName) {
         parents: [],
         spouses: new Set(),
         children: [],
-        processed: false
+        processed: false,
+        rootName: name // Initialize with own name, will be updated if there's an ancestor
     };
 }
 
@@ -429,7 +474,7 @@ function addParentChildEdge(from, to, edges, processedPairs) {
     }
 }
 
-function drawNetwork(nodes, edges) {
+function drawNetwork(nodes, edges, mothers) {
     const container = document.getElementById('network');
     if (network) network.destroy();
     
@@ -466,6 +511,18 @@ function drawNetwork(nodes, edges) {
             zoomView: true,
             hover: true
         }
+    });
+
+    // Add event listeners for the details panel
+    network.on('selectNode', function(params) {
+        if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0].split('@')[0]; // Get the name part before @
+            showDetailsPanel(nodeId);
+        }
+    });
+
+    network.on('deselectNode', function(params) {
+        closeDetailsPanel();
     });
 
     // Fit the view after drawing
@@ -739,3 +796,111 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show welcome card on initial load
     showWelcome();
 });
+
+function calculateAge(birthDate, endDate) {
+    if (!birthDate) return 'N/A';
+    
+    // Convert date string from "DD-MM-YYYY" to Date object
+    const [birthDay, birthMonth, birthYear] = birthDate.split('-').map(num => parseInt(num));
+    if (isNaN(birthYear)) return 'N/A';
+    
+    const birthDateObj = new Date(birthYear, birthMonth - 1, birthDay); // month is 0-based in JS
+    
+    let endDateObj;
+    if (endDate) {
+        const [endDay, endMonth, endYear] = endDate.split('-').map(num => parseInt(num));
+        if (isNaN(endYear)) return 'N/A';
+        endDateObj = new Date(endYear, endMonth - 1, endDay);
+    } else {
+        endDateObj = new Date(); // Current date for living persons
+    }
+    
+    // Calculate age considering months and days
+    let age = endDateObj.getFullYear() - birthDateObj.getFullYear();
+    const monthDiff = endDateObj.getMonth() - birthDateObj.getMonth();
+    
+    // Adjust age if birthday hasn't occurred this year
+    if (monthDiff < 0 || (monthDiff === 0 && endDateObj.getDate() < birthDateObj.getDate())) {
+        age--;
+    }
+    
+    if (age < 0) return 'N/A';
+    
+    if (endDate) {
+        return `${age} (deceased)`;
+    } else {
+        return `${age}`;
+    }
+}
+
+function showDetailsPanel(nodeId) {
+    const person = peopleData.get(nodeId);
+    if (!person) return;
+
+    // Update details panel content and make full name clickable
+    const fullNameSpan = document.getElementById('full-name');
+    fullNameSpan.textContent = person.name || 'N/A';
+    fullNameSpan.style.cursor = 'pointer';
+    fullNameSpan.style.color = 'var(--primary)';
+    fullNameSpan.style.textDecoration = 'underline';
+    fullNameSpan.onclick = () => {
+        const personNodeId = findNodeIdByName(person.name);
+        if (personNodeId) {
+            network.focus(personNodeId, {
+                scale: 1.5,
+                animation: {
+                    duration: 500,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
+            network.selectNodes([personNodeId]);
+        }
+    };
+    
+    // Create clickable root name element
+    const rootNameSpan = document.getElementById('root-name');
+    rootNameSpan.textContent = person.rootName || 'N/A';
+    rootNameSpan.style.cursor = 'pointer';
+    rootNameSpan.style.color = 'var(--primary)';
+    rootNameSpan.style.textDecoration = 'underline';
+    rootNameSpan.onclick = () => {
+        if (person.rootName) {
+            const rootNodeId = findNodeIdByName(person.rootName);
+            if (rootNodeId) {
+                network.focus(rootNodeId, {
+                    scale: 1.5,
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                network.selectNodes([rootNodeId]);
+            }
+        }
+    };
+
+    document.getElementById('birth-date').textContent = person.birthDate || 'N/A';
+    document.getElementById('age').textContent = calculateAge(person.birthDate, person.endDate);
+    document.getElementById('end-date').textContent = person.endDate || 'N/A';
+
+    // Handle person image
+    const personImgContainer = document.querySelector('.image-container');
+    const personImg = document.getElementById('person-image');
+    personImgContainer.style.display = 'block';
+
+    if (person.picture) {
+        personImg.src = person.picture;
+        personImg.onerror = () => {
+            personImg.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+        };
+    } else {
+        personImg.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+    }
+
+    // Show the panel
+    document.getElementById('details-panel').classList.add('open');
+}
+
+function closeDetailsPanel() {
+    document.getElementById('details-panel').classList.remove('open');
+}
