@@ -32,7 +32,10 @@
 
             <div class="input-container">
                 <textarea id="input" class="half-size"
-                    placeholder="Enter family data here"></textarea>
+                    placeholder="John Smith + Mary Jones
+Sarah John Smith
+
+or Use Google Sheet link"></textarea>
                 <div class="controls">
                     <button class="full-width"
                         onclick="generateTree()">Generate</button>
@@ -122,12 +125,12 @@
                     <div class="step">
                         <div class="step-number">3</div>
                         <div class="step-content">
-                            <h3>Customize</h3>
+                            <h3>Controls</h3>
                             <div class="controls-grid">
-                                <span>🔍 Search</span>
-                                <span>↔️ Spacing</span>
-                                <span>⇕ Direction</span>
-                                <span>🌓 Theme</span>
+                                <span> 🔍 Search |</span>
+                                <span> ↔️ Spacing |</span>
+                                <span> ⇕ Direction |</span>
+                                <span> 🌓 Theme </span>
                             </div>
                         </div>
                     </div>
@@ -153,16 +156,12 @@
                 <div class="profile-images">
                     <div class="image-container">
                         <img id="person-image" src="" alt="Person" class="profile-image">
-                        <span>Person</span>
+                        <span id="person-name"></span>
                     </div>
                 </div>
                 <div class="details-info">
                     <div class="info-row">
-                        <label>Full Name:</label>
-                        <span id="full-name"></span>
-                    </div>
-                    <div class="info-row">
-                        <label>Root Name:</label>
+                        <label>Family Root:</label>
                         <span id="root-name"></span>
                     </div>
                     <div class="info-row">

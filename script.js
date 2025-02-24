@@ -490,7 +490,10 @@ function drawNetwork(nodes, edges, mothers) {
         }
     });
 
-    network = new vis.Network(container, { nodes, edges }, {
+    network = new vis.Network(container, {
+        nodes: new vis.DataSet(nodes),
+        edges: new vis.DataSet(edges)
+    }, {
         layout: {
             hierarchical: {
                 enabled: false
@@ -839,23 +842,6 @@ function showDetailsPanel(nodeId) {
 
     // Update details panel content and make full name clickable
     const fullNameSpan = document.getElementById('full-name');
-    fullNameSpan.textContent = person.name || 'N/A';
-    fullNameSpan.style.cursor = 'pointer';
-    fullNameSpan.style.color = 'var(--primary)';
-    fullNameSpan.style.textDecoration = 'underline';
-    fullNameSpan.onclick = () => {
-        const personNodeId = findNodeIdByName(person.name);
-        if (personNodeId) {
-            network.focus(personNodeId, {
-                scale: 1.5,
-                animation: {
-                    duration: 500,
-                    easingFunction: 'easeInOutQuad'
-                }
-            });
-            network.selectNodes([personNodeId]);
-        }
-    };
     
     // Create clickable root name element
     const rootNameSpan = document.getElementById('root-name');
@@ -883,10 +869,29 @@ function showDetailsPanel(nodeId) {
     document.getElementById('age').textContent = calculateAge(person.birthDate, person.endDate);
     document.getElementById('end-date').textContent = person.endDate || 'N/A';
 
-    // Handle person image
+    // Handle person image and name
     const personImgContainer = document.querySelector('.image-container');
     const personImg = document.getElementById('person-image');
+    const personNameSpan = document.getElementById('person-name');
     personImgContainer.style.display = 'block';
+
+    personNameSpan.textContent = person.name || 'N/A';
+    personNameSpan.style.cursor = 'pointer';
+    personNameSpan.style.color = 'var(--primary)';
+    personNameSpan.style.textDecoration = 'underline';
+    personNameSpan.onclick = () => {
+        const personNodeId = findNodeIdByName(person.name);
+        if (personNodeId) {
+            network.focus(personNodeId, {
+                scale: 1.5,
+                animation: {
+                    duration: 500,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
+            network.selectNodes([personNodeId]);
+        }
+    };
 
     if (person.picture) {
         personImg.src = person.picture;
@@ -899,6 +904,8 @@ function showDetailsPanel(nodeId) {
 
     // Show the panel
     document.getElementById('details-panel').classList.add('open');
+
+    document.getElementById('person-name').textContent = person.name || 'N/A';
 }
 
 function closeDetailsPanel() {
