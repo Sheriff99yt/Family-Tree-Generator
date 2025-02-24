@@ -4,6 +4,7 @@ let network;
 let fuse;
 let layoutModeIndex = 0;
 const layoutModes = ["up-to-down", "down-to-up", "left-to-right", "right-to-left"];
+let currentNodeId = null;
 
 function toggleDarkMode() {
     isDarkMode = !isDarkMode;
@@ -431,7 +432,7 @@ function addParentChildEdge(from, to, edges, processedPairs) {
 function drawNetwork(nodes, edges) {
     const container = document.getElementById('network');
     if (network) network.destroy();
-
+    
     // Calculate custom positions
     const positions = calculateCustomPositions(nodes, edges);
     
@@ -447,11 +448,11 @@ function drawNetwork(nodes, edges) {
     network = new vis.Network(container, { nodes, edges }, {
         layout: {
             hierarchical: {
-                enabled: false // Disable default hierarchical layout
+                enabled: false
             }
         },
         physics: {
-            enabled: false // Disable physics to maintain fixed positions
+            enabled: false
         },
         edges: {
             smooth: {
@@ -714,3 +715,27 @@ function updateEdgeSmoothing() {
     const edgeType = (mode === "up-to-down" || mode === "down-to-up") ? "horizontal" : "vertical";
     network.setOptions({ edges: { smooth: { type: edgeType, roundness: 0.5 } } });
 }
+
+function showWelcome() {
+    const overlay = document.getElementById('welcomeOverlay');
+    overlay.style.display = 'flex';
+    overlay.style.opacity = '1';
+}
+
+function closeWelcome() {
+    const overlay = document.getElementById('welcomeOverlay');
+    overlay.style.opacity = '0';
+    setTimeout(() => {
+        overlay.style.display = 'none';
+    }, 300);
+}
+
+// Initialize welcome card
+document.addEventListener('DOMContentLoaded', function() {
+    const overlay = document.getElementById('welcomeOverlay');
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.3s ease';
+    
+    // Show welcome card on initial load
+    showWelcome();
+});

@@ -1,59 +1,147 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Family Tree Generator</title>
-    <!-- External CSS dependencies -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap" rel="stylesheet">
-    <!-- Local CSS -->
-    <link href="style.css" rel="stylesheet">
-</head>
-<body class="dark-mode">
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <h2>Family Tree Generator</h2>
-        </div>
-        
-        <div class="search-container">
-            <input type="text" id="searchInput" class="search-input" placeholder="Search family members...">
-            <div id="searchResults" class="search-results"></div>
-        </div>
-        
-        <div class="input-container">
-            <textarea id="input" class="half-size" placeholder="Enter family data here"></textarea>
-            <div class="controls">
-                <button class="full-width" onclick="generateTree()">Generate</button>
-                <button class="secondary" onclick="clearAll()">Clear</button>
+    <head>
+        <meta name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>Family Tree Generator</title>
+        <link rel="icon" type="image/png" href="favicon.png">
+        <!-- External CSS dependencies -->
+        <link
+            href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css"
+            rel="stylesheet">
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+            rel="stylesheet">
+        <link
+            href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap"
+            rel="stylesheet">
+        <!-- Local CSS -->
+        <link href="style.css" rel="stylesheet">
+    </head>
+    <body class="dark-mode">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Family Tree Generator</h2>
             </div>
-            <!-- New spacing sliders below the buttons -->
-            <div class="spacing-sliders">
-                <label>Vertical Spacing:
-                    <input type="range" id="verticalSpacing" min="50" max="300" value="150">
-                </label>
-                <label>Horizontal Spacing:
-                    <input type="range" id="horizontalSpacing" min="20" max="150" value="50">
-                </label>
+
+            <div class="search-container">
+                <input type="text" id="searchInput" class="search-input"
+                    placeholder="Search family members...">
+                <div id="searchResults" class="search-results"></div>
+            </div>
+
+            <div class="input-container">
+                <textarea id="input" class="half-size"
+                    placeholder="Enter family data here"></textarea>
+                <div class="controls">
+                    <button class="full-width"
+                        onclick="generateTree()">Generate</button>
+                    <button class="secondary"
+                        onclick="clearAll()">Clear</button>
+                </div>
+                <!-- New spacing sliders below the buttons -->
+                <div class="spacing-sliders">
+                    <label>Vertical Spacing:
+                        <input type="range" id="verticalSpacing" min="50"
+                            max="300" value="150">
+                    </label>
+                    <label>Horizontal Spacing:
+                        <input type="range" id="horizontalSpacing" min="20"
+                            max="150" value="50">
+                    </label>
+                </div>
+                <!-- Add this after the existing controls div -->
+                <div id="emoji-picker" class="emoji-picker"
+                    style="display: none;">
+                    <div class="emoji-header">
+                        <h3>Add Emojis (max 3)</h3>
+                        <button class="close-emoji">×</button>
+                    </div>
+                    <div class="emoji-grid">
+                        <!-- Common family-related emojis -->
+                        <button>👨</button><button>👩</button><button>👶</button>
+                        <button>👴</button><button>👵</button><button>👪</button>
+                        <button>💑</button><button>💝</button><button>👼</button>
+                        <button>��</button><button>👑</button><button>⭐</button>
+                        <button>🌟</button><button>💫</button><button>✨</button>
+                    </div>
+                    <div class="selected-emojis"></div>
+                    <button class="save-emojis">Save</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+        <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
 
-    <div id="network"></div>
+        <div id="network"></div>
 
-    <div class="floating-controls">
-        <button id="layout-toggle" class="dark-mode-toggle" onclick="toggleLayout()" title="Toggle Layout">⇕</button>
-        <button class="fit-view-toggle" onclick="fitView()" title="Fit View">⤡</button>
-        <button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌓</button>
-    </div>
+        <div class="floating-controls">
+            <button id="info-toggle" class="dark-mode-toggle"
+                onclick="showWelcome()" title="Show Help">ℹ️</button>
+            <button id="layout-toggle" class="dark-mode-toggle"
+                onclick="toggleLayout()" title="Toggle Layout">⇕</button>
+            <button class="fit-view-toggle" onclick="fitView()"
+                title="Fit View">⤡</button>
+            <button class="dark-mode-toggle" onclick="toggleDarkMode()"
+                title="Toggle Dark Mode">🌓</button>
+        </div>
 
-    <!-- External JS dependencies -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-    <!-- Local JS -->
-    <script src="script.js"></script>
-</body>
+        <!-- External JS dependencies -->
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.min.js"></script>
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+        <!-- Local JS -->
+        <script src="script.js"></script>
+
+        <div class="welcome-overlay" id="welcomeOverlay">
+            <div class="welcome-card">
+                <h2>Family Tree Generator</h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Add Names</h3>
+                            <ul class="compact-list">
+                                <li>Child: <code>Mike John Smith</code></li>
+                                <li>Marriage: <code>John + Mary</code></li>
+                                <li class="sheets-option">Or use Google Sheets
+                                    link</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Generate</h3>
+                            <p>Click "Generate" to create tree</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Customize</h3>
+                            <div class="controls-grid">
+                                <span>🔍 Search</span>
+                                <span>↔️ Spacing</span>
+                                <span>⇕ Direction</span>
+                                <span>🌓 Theme</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="button-container">
+                    <button class="welcome-button" onclick="closeWelcome()">Get Started</button>
+                    <a href="https://github.com/Sheriff99yt/Family-Tree-Generator" target="_blank" class="github-link">
+                        <svg height="20" width="20" viewBox="0 0 16 16" class="github-icon">
+                            <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                        </svg>
+                        GitHub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </body>
 </html>
