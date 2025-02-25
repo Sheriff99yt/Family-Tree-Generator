@@ -1,0 +1,32 @@
+{
+  "name": "family-tree-generator",
+  "version": "1.0.0",
+  "description": "A web application for generating family trees from structured text input",
+  "main": "js/app.js",
+  "scripts": {
+    "start": "http-server -o",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sheriff99yt/Family-Tree-Generator.git"
+  },
+  "keywords": [
+    "family-tree",
+    "genealogy",
+    "visualization"
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Sheriff99yt/Family-Tree-Generator/issues"
+  },
+  "homepage": "https://github.com/Sheriff99yt/Family-Tree-Generator#readme",
+  "dependencies": {
+    "fuse.js": "^6.6.2",
+    "vis-network": "^9.1.6"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+} 

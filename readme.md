@@ -69,22 +69,16 @@ A vanilla JavaScript/HTML solution for generating family trees from structured t
 
 ## Code Structure
 
-### Core Components
-1. **Network Visualization**
-   - Uses vis.js Network for interactive graph display
-   - Custom node positioning algorithm
-   - Four-way layout rotation (up, down, left, right)
+### Modular Architecture
+The application has been refactored into a modular structure for better maintainability and readability. The JavaScript code is organized into the following modules:
 
-2. **Data Management**
-   - Person objects with bidirectional relationships
-   - Automatic spouse network detection
-   - Dynamic tree restructuring
+- **app.js**: Main application file that coordinates all modules
+- **data.js**: Handles data processing and management
+- **utils.js**: Contains utility functions
+- **visualization.js**: Manages tree visualization
+- **ui.js**: Handles user interface functionality
 
-3. **User Interface**
-   - Responsive sidebar with mobile support
-   - Real-time search with Fuse.js
-   - Dynamic spacing controls
-   - Dark/Light theme switching
+For more details on the modular structure, see [js/README.md](js/README.md).
 
 ### Key Functions
 

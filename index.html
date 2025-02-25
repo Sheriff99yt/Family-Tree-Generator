@@ -50,54 +50,48 @@ or Use Google Sheet link"></textarea>
                     </label>
                     <label>Horizontal Spacing:
                         <input type="range" id="horizontalSpacing" min="20"
-                            max="150" value="50">
+                            max="200" value="50">
                     </label>
-                </div>
-                <!-- Add this after the existing controls div -->
-                <div id="emoji-picker" class="emoji-picker"
-                    style="display: none;">
-                    <div class="emoji-header">
-                        <h3>Add Emojis (max 3)</h3>
-                        <button class="close-emoji">×</button>
-                    </div>
-                    <div class="emoji-grid">
-                        <!-- Common family-related emojis -->
-                        <button>👨</button><button>👩</button><button>👶</button>
-                        <button>👴</button><button>👵</button><button>👪</button>
-                        <button>💑</button><button>💝</button><button>👼</button>
-                        <button>��</button><button>👑</button><button>⭐</button>
-                        <button>🌟</button><button>💫</button><button>✨</button>
-                    </div>
-                    <div class="selected-emojis"></div>
-                    <button class="save-emojis">Save</button>
                 </div>
             </div>
         </div>
 
-        <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
-
-        <div id="network"></div>
-
-        <div class="floating-controls">
-            <button id="info-toggle" class="dark-mode-toggle"
-                onclick="showWelcome()" title="Show Help">ℹ️</button>
-            <button id="layout-toggle" class="dark-mode-toggle"
-                onclick="toggleLayout()" title="Toggle Layout">⇕</button>
-            <button class="fit-view-toggle" onclick="fitView()"
-                title="Fit View">⤡</button>
-            <button class="dark-mode-toggle" onclick="toggleDarkMode()"
-                title="Toggle Dark Mode">🌓</button>
+        <div class="mobile-toggle" onclick="toggleSidebar()">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
         </div>
 
+        <div class="toolbar">
+            <button class="tool-button" onclick="toggleDarkMode()" title="Toggle Dark Mode">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </button>
+            <button class="tool-button" onclick="toggleLayout()" title="Change Tree Direction">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="7 13 12 18 17 13"></polyline>
+                    <polyline points="7 6 12 11 17 6"></polyline>
+                </svg>
+            </button>
+            <button class="tool-button" onclick="fitView()" title="Fit to Screen">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <polyline points="9 21 3 21 3 15"></polyline>
+                    <line x1="21" y1="3" x2="14" y2="10"></line>
+                    <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+            </button>
+        </div>
+
+        <div id="network" class="network-container"></div>
+
         <!-- External JS dependencies -->
-        <script
-            src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
-        <script
-            src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.min.js"></script>
-        <script
-            src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-        <!-- Local JS -->
-        <script src="script.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.4.6"></script>
+        
+        <!-- Load the modular JavaScript files -->
+        <script type="module" src="js/app.js"></script>
 
         <div class="welcome-overlay" id="welcomeOverlay">
             <div class="welcome-card">

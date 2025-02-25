@@ -868,3 +868,48 @@ textarea {
     }
 }
 
+/* Toolbar styling for vertical layout at bottom right */
+.toolbar {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column-reverse; /* Changed to column-reverse to stack buttons from bottom to top */
+    gap: 10px;
+    z-index: 9999; /* Increased z-index to ensure it's on top */
+}
+
+.tool-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: var(--primary); /* Changed to primary color for visibility */
+    color: white; /* Changed to white for better contrast */
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Enhanced shadow */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.tool-button:hover {
+    transform: scale(1.1);
+    background-color: var(--primary-hover);
+    color: white;
+}
+
+/* Responsive adjustments for toolbar */
+@media (max-width: 768px) {
+    .toolbar {
+        bottom: 10px;
+        right: 10px;
+    }
+    
+    .tool-button {
+        width: 40px;
+        height: 40px;
+    }
+}
+
