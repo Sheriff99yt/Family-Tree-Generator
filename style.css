@@ -675,24 +675,107 @@ textarea {
     cursor: pointer;
 }
 
+/* Error notification */
 .notification {
     position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--card-bg);
-    padding: 1rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    top: 20px;
+    right: 20px;
+    width: 350px;
+    padding: 15px 20px;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 1000;
-    animation: fadeInOut 5s forwards;
+    animation: slideIn 0.3s ease-out forwards;
+    color: #333;
 }
 
-@keyframes fadeInOut {
-    0% { opacity: 0; transform: translate(-50%, 20px); }
-    10% { opacity: 1; transform: translate(-50%, 0); }
-    90% { opacity: 1; transform: translate(-50%, 0); }
-    100% { opacity: 0; transform: translate(-50%, 20px); }
+.notification.error {
+    background-color: #fff8f8;
+    border-left: 4px solid #ff3b30;
+}
+
+.notification h3 {
+    margin: 0 0 10px;
+    padding-right: 20px;
+    font-size: 18px;
+    color: #ff3b30;
+}
+
+.notification p {
+    margin: 0 0 10px;
+    line-height: 1.5;
+}
+
+.notification .help-text {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    font-size: 14px;
+}
+
+.notification .help-text ol {
+    margin: 10px 0 0;
+    padding-left: 20px;
+}
+
+.notification .help-text li {
+    margin-bottom: 5px;
+}
+
+.close-notification {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    color: #999;
+    transition: color 0.2s;
+}
+
+.close-notification:hover {
+    color: #333;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Dark mode support for notifications */
+@media (prefers-color-scheme: dark) {
+    .notification {
+        background-color: #2a2a2a;
+        color: #eee;
+    }
+    
+    .notification.error {
+        background-color: #2a2020;
+        border-left: 4px solid #ff3b30;
+    }
+    
+    .notification .help-text {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .close-notification {
+        color: #aaa;
+    }
+    
+    .close-notification:hover {
+        color: #fff;
+    }
 }
 
 .note-input-dialog {
@@ -866,5 +949,126 @@ textarea {
         bottom: 10px;
         right: 50%;
     }
+}
+
+/* Loading indicator for Google Sheets fetch */
+#loading-indicator {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    color: white;
+    font-size: 1.2rem;
+}
+
+#loading-indicator .spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+    margin-bottom: 15px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Google Sheets Help Section */
+.google-sheets-help {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border);
+}
+
+.google-sheets-help summary {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+}
+
+.google-sheets-help summary:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.google-sheets-help summary:focus {
+    outline: none;
+}
+
+.google-sheets-help summary::before {
+    content: "ℹ️";
+    margin-right: 8px;
+    font-size: 1.1em;
+}
+
+.help-content {
+    padding: 10px 15px;
+    border-top: 1px solid var(--border);
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.help-content p {
+    margin: 0 0 10px;
+    line-height: 1.4;
+}
+
+.help-content ol {
+    margin: 0 0 10px;
+    padding-left: 25px;
+}
+
+.help-content li {
+    margin-bottom: 5px;
+}
+
+.help-content code {
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+.help-content .note {
+    font-style: italic;
+    color: #777;
+    margin-top: 10px;
+    font-size: 0.85em;
+}
+
+/* Dark mode styles for Google Sheets help */
+.dark-mode .google-sheets-help {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .google-sheets-help summary:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .help-content {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.dark-mode .help-content code {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .help-content .note {
+    color: #aaa;
 }
 

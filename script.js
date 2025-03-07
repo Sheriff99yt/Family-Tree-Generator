@@ -14,108 +14,314 @@ function toggleDarkMode() {
 
 // Updated generateTree to support Google Sheets link input
 async function generateTree() {
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.id = 'loading-indicator';
+    loadingIndicator.innerHTML = '<div class="spinner"></div><p>Loading data...</p>';
+    document.body.appendChild(loadingIndicator);
+    
     let rawInput = document.getElementById('input').value.trim();
     let input;
     let additionalData = new Map();
 
-    // Handle Google Sheets input
-    if (rawInput.startsWith("http") && rawInput.includes("docs.google.com")) {
-        const csvUrl = convertSheetUrlToCsvUrl(rawInput);
-        try {
-            const csvData = await fetch(csvUrl).then(res => res.text());
-            const parsedData = parseCsvForFullNames(csvData);
-            input = parsedData.map(p => p.name).join("\n");
-            
-            // Store additional data in the Map
-            parsedData.forEach(person => {
-                additionalData.set(person.name, {
-                    birthDate: person.birthDate,
-                    endDate: person.endDate,
-                    picture: person.picture
-                    // Don't store rootName from spreadsheet as we'll calculate it
+    try {
+        // Handle Google Sheets input
+        if (rawInput.startsWith("http") && rawInput.includes("docs.google.com")) {
+            try {
+                const result = await fetchGoogleSheetsData(rawInput);
+                if (!result.success) {
+                    throw new Error(result.errorMessage);
+                }
+                
+                input = result.parsedData.map(p => p.name).join("\n");
+                
+                // Store additional data in the Map
+                result.parsedData.forEach(person => {
+                    additionalData.set(person.name, {
+                        birthDate: person.birthDate,
+                        endDate: person.endDate,
+                        picture: person.picture
+                    });
+                });
+            } catch (e) {
+                showErrorNotification(e.message);
+                return;
+            }
+        } else {
+            input = rawInput;
+        }
+        
+        // Start processing tree with the (possibly modified) input
+        peopleData.clear();
+        const spouseRelations = new Set();
+        const mothers = new Set();
+
+        input.split('\n').forEach(line => {
+            line = line.trim();
+            if (!line) return;
+
+            if (line.includes('+')) {
+                const [left, right] = line.split('+').map(s => s.trim());
+                processSpouses(peopleData, spouseRelations, left, right, mothers);
+            } else {
+                processChild(peopleData, line, mothers);
+            }
+        });
+
+        // Add the additional data to the peopleData entries
+        additionalData.forEach((data, name) => {
+            if (peopleData.has(name)) {
+                const person = peopleData.get(name);
+                person.birthDate = data.birthDate;
+                person.endDate = data.endDate;
+                person.picture = data.picture;
+                // Root name is already set by buildAncestryChain
+            }
+        });
+
+        peopleData.forEach(person => {
+            person.children.forEach(child => {
+                person.spouses.forEach(spouse => {
+                    const spouseNode = peopleData.get(spouse);
+                    if (spouseNode && !spouseNode.children.includes(child)) {
+                        spouseNode.children.push(child);
+                    }
                 });
             });
-        } catch (e) {
-            alert("Failed to fetch Google Sheet data");
-            return;
-        }
-    } else {
-        input = rawInput;
-    }
-    
-    // Start processing tree with the (possibly modified) input
-    peopleData.clear();
-    const spouseRelations = new Set();
-    const mothers = new Set();
-
-    input.split('\n').forEach(line => {
-        line = line.trim();
-        if (!line) return;
-
-        if (line.includes('+')) {
-            const [left, right] = line.split('+').map(s => s.trim());
-            processSpouses(peopleData, spouseRelations, left, right, mothers);
-        } else {
-            processChild(peopleData, line, mothers);
-        }
-    });
-
-    // Add the additional data to the peopleData entries
-    additionalData.forEach((data, name) => {
-        if (peopleData.has(name)) {
-            const person = peopleData.get(name);
-            person.birthDate = data.birthDate;
-            person.endDate = data.endDate;
-            person.picture = data.picture;
-            // Root name is already set by buildAncestryChain
-        }
-    });
-
-    peopleData.forEach(person => {
-        person.children.forEach(child => {
-            person.spouses.forEach(spouse => {
-                const spouseNode = peopleData.get(spouse);
-                if (spouseNode && !spouseNode.children.includes(child)) {
-                    spouseNode.children.push(child);
-                }
-            });
         });
-    });
 
-    const { nodes, edges } = createFamilyTrees(peopleData, mothers);
-    drawNetwork(nodes, edges, mothers);
+        const { nodes, edges } = createFamilyTrees(peopleData, mothers);
+        drawNetwork(nodes, edges, mothers);
 
-    const peopleList = Array.from(peopleData.values()).map(p => ({ name: p.name, displayName: p.displayName }));
-    fuse = new Fuse(peopleList, {
-        keys: ['name'],
-        threshold: 0.4,
-        includeScore: true,
-        shouldSort: true,
-    });
-    setupSearch();
+        const peopleList = Array.from(peopleData.values()).map(p => ({ name: p.name, displayName: p.displayName }));
+        fuse = new Fuse(peopleList, {
+            keys: ['name'],
+            threshold: 0.4,
+            includeScore: true,
+            shouldSort: true,
+        });
+        setupSearch();
 
-    // Retract the panel after generating the tree:
-    const sidebar = document.querySelector('.sidebar');
-    const mobileToggle = document.querySelector('.mobile-toggle');
-    sidebar.classList.remove('open');
-    mobileToggle.classList.remove('open');
+        // Retract the panel after generating the tree:
+        const sidebar = document.querySelector('.sidebar');
+        const mobileToggle = document.querySelector('.mobile-toggle');
+        sidebar.classList.remove('open');
+        mobileToggle.classList.remove('open');
 
-    // Update edge smoothing based on current layout mode
-    updateEdgeSmoothing();
+        // Update edge smoothing based on current layout mode
+        updateEdgeSmoothing();
 
-    // Apply the last selected layout rotation
-    applyLayoutRotation();
+        // Apply the last selected layout rotation
+        applyLayoutRotation();
+    } finally {
+        // Remove loading indicator regardless of success/failure
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.remove();
+        }
+    }
 }
 
 // Helper function: Convert Google Sheets URL to CSV export URL
 function convertSheetUrlToCsvUrl(url) {
-    // Example link: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit#gid=SHEET_ID
+    // Parse out the spreadsheet ID and gid from the URL
     const sheetIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
     const gidMatch = url.match(/gid=(\d+)/);
-    if (!sheetIdMatch) return url;
+    
+    if (!sheetIdMatch) {
+        throw new Error("Invalid Google Sheets URL format. Expected format: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/...");
+    }
+    
     const spreadsheetId = sheetIdMatch[1];
     const gid = gidMatch ? gidMatch[1] : '0';
+    
     return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&id=${spreadsheetId}&gid=${gid}`;
+}
+
+/**
+ * Fetches and parses data from a Google Sheet URL
+ * @param {string} url - The Google Sheets URL
+ * @returns {Promise<Object>} - Object containing success status, parsed data, and error message if any
+ */
+async function fetchGoogleSheetsData(url) {
+    // Extract the spreadsheet ID
+    const sheetIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (!sheetIdMatch) {
+        return {
+            success: false,
+            errorMessage: "Invalid Google Sheets URL format. Expected format: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/..."
+        };
+    }
+    const spreadsheetId = sheetIdMatch[1];
+    const gidMatch = url.match(/gid=(\d+)/);
+    const gid = gidMatch ? gidMatch[1] : '0';
+    
+    // Try multiple approaches to get the data
+    const methods = [
+        tryGoogleSheetsAPI,
+        tryPublicJsonApi,
+        tryCorsProxies
+    ];
+    
+    for (const method of methods) {
+        try {
+            const result = await method(spreadsheetId, gid);
+            if (result && result.success) {
+                return result;
+            }
+        } catch (error) {
+            console.log(`Method failed: ${error.message}`);
+            // Continue to next method
+        }
+    }
+    
+    // If all methods failed
+    return {
+        success: false,
+        errorMessage: `Unable to access Google Sheet. Please ensure:
+        1. The sheet is publicly accessible (Anyone with the link can view)
+        2. Your sheet has a column titled exactly "Full Names"
+        3. You're connected to the internet`
+    };
+}
+
+/**
+ * Try to use the Google Sheets API to fetch the data
+ */
+async function tryGoogleSheetsAPI(spreadsheetId, gid) {
+    try {
+        // Use the Google Visualization API which has less CORS restrictions
+        const apiUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${gid}`;
+        const response = await fetch(apiUrl);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const csvData = await response.text();
+        const parsedData = parseCsvForFullNames(csvData);
+        
+        if (parsedData.length === 0) {
+            throw new Error("No valid data found");
+        }
+        
+        return {
+            success: true,
+            parsedData
+        };
+    } catch (error) {
+        console.log("Google Sheets API approach failed:", error);
+        throw error;
+    }
+}
+
+/**
+ * Try to use public APIs that allow CORS
+ */
+async function tryPublicJsonApi(spreadsheetId, gid) {
+    try {
+        // Try using the sheetdb.io API which handles CORS
+        const apiUrl = `https://opensheet.elk.sh/${spreadsheetId}/${gid}`;
+        const response = await fetch(apiUrl);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const jsonData = await response.json();
+        
+        if (!jsonData || !Array.isArray(jsonData) || jsonData.length === 0) {
+            throw new Error("No data returned from API");
+        }
+        
+        // Convert JSON to expected format
+        const parsedData = jsonData.map(row => {
+            // Find the "Full Names" or equivalent field
+            const fullNameKey = Object.keys(row).find(key => 
+                key.toLowerCase().includes("full") && key.toLowerCase().includes("name"));
+            
+            const birthDateKey = Object.keys(row).find(key => 
+                key.toLowerCase().includes("birth") && key.toLowerCase().includes("date"));
+            
+            const endDateKey = Object.keys(row).find(key => 
+                (key.toLowerCase().includes("end") || key.toLowerCase().includes("death")) && 
+                key.toLowerCase().includes("date"));
+            
+            const pictureKey = Object.keys(row).find(key => 
+                key.toLowerCase().includes("picture") || key.toLowerCase().includes("photo"));
+            
+            const rootNameKey = Object.keys(row).find(key => 
+                key.toLowerCase().includes("root") && key.toLowerCase().includes("name"));
+                
+            if (!fullNameKey || !row[fullNameKey]) {
+                return null;
+            }
+            
+            return {
+                name: row[fullNameKey],
+                birthDate: birthDateKey ? row[birthDateKey] : null,
+                endDate: endDateKey ? row[endDateKey] : null,
+                picture: pictureKey ? row[pictureKey] : null,
+                rootName: rootNameKey ? row[rootNameKey] : null
+            };
+        }).filter(Boolean); // Remove null entries
+        
+        if (parsedData.length === 0) {
+            throw new Error("No valid entries found after parsing");
+        }
+        
+        return {
+            success: true,
+            parsedData
+        };
+    } catch (error) {
+        console.log("Public JSON API approach failed:", error);
+        throw error;
+    }
+}
+
+/**
+ * Try various CORS proxies as a last resort
+ */
+async function tryCorsProxies(spreadsheetId, gid) {
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&id=${spreadsheetId}&gid=${gid}`;
+    
+    // List of available CORS proxies to try
+    const corsProxies = [
+        "https://api.allorigins.win/raw?url=",
+        "https://corsproxy.io/?",
+        "https://bypass-cors.herokuapp.com/",
+        "https://cors-anywhere.herokuapp.com/",
+        "https://crossorigin.me/"
+    ];
+    
+    // Try each proxy until one works
+    for (const proxy of corsProxies) {
+        try {
+            const proxyUrl = `${proxy}${encodeURIComponent(csvUrl)}`;
+            const response = await fetch(proxyUrl);
+            
+            if (!response.ok) {
+                throw new Error(`Proxy returned status: ${response.status}`);
+            }
+            
+            const csvData = await response.text();
+            const parsedData = parseCsvForFullNames(csvData);
+            
+            if (parsedData.length === 0) {
+                throw new Error("No valid data found");
+            }
+            
+            return {
+                success: true,
+                parsedData
+            };
+        } catch (error) {
+            console.log(`Proxy ${proxy} failed:`, error);
+            // Continue to next proxy
+        }
+    }
+    
+    throw new Error("All CORS proxies failed");
 }
 
 // Helper function: Parse CSV and extract names from the "Full Names" column
@@ -132,18 +338,44 @@ function parseCsvForFullNames(csvText) {
         picture: headers.findIndex(h => h === "person picture"),
         rootName: headers.findIndex(h => h === "root name")
     };
+    
+    // Validate required columns exist
+    if (columnIndices.fullName === -1) {
+        throw new Error("Required column 'Full Names' not found in the spreadsheet");
+    }
 
     // Process each line
     const peopleData = [];
     for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map(col => col.trim());
+        // Handle quoted CSV values correctly
+        let cols = [];
+        let inQuote = false;
+        let currentCol = '';
+        let line = lines[i];
+        
+        for (let j = 0; j < line.length; j++) {
+            const char = line[j];
+            
+            if (char === '"' && (j === 0 || line[j-1] !== '\\')) {
+                inQuote = !inQuote;
+            } else if (char === ',' && !inQuote) {
+                cols.push(currentCol.trim());
+                currentCol = '';
+            } else {
+                currentCol += char;
+            }
+        }
+        
+        // Add the last column
+        cols.push(currentCol.trim());
+        
         if (cols[columnIndices.fullName]) {
             const person = {
-                name: cols[columnIndices.fullName],
-                birthDate: columnIndices.birthDate >= 0 ? cols[columnIndices.birthDate] : null,
-                endDate: columnIndices.endDate >= 0 ? cols[columnIndices.endDate] : null,
+                name: cols[columnIndices.fullName].replace(/^"|"$/g, ''), // Remove surrounding quotes
+                birthDate: columnIndices.birthDate >= 0 ? cols[columnIndices.birthDate].replace(/^"|"$/g, '') : null,
+                endDate: columnIndices.endDate >= 0 ? cols[columnIndices.endDate].replace(/^"|"$/g, '') : null,
                 picture: null, // We can't get embedded images from CSV
-                rootName: columnIndices.rootName >= 0 ? cols[columnIndices.rootName] : null
+                rootName: columnIndices.rootName >= 0 ? cols[columnIndices.rootName].replace(/^"|"$/g, '') : null
             };
             peopleData.push(person);
         }
@@ -919,4 +1151,65 @@ function showDetailsPanel(nodeId) {
 
 function closeDetailsPanel() {
     document.getElementById('details-panel').classList.remove('open');
+}
+
+/**
+ * Displays a user-friendly error notification
+ * @param {string} message - The error message to display
+ */
+function showErrorNotification(message) {
+    // Remove any existing notifications
+    const existingNotification = document.getElementById('error-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.id = 'error-notification';
+    notification.className = 'notification error';
+    
+    // Add heading and message
+    const heading = document.createElement('h3');
+    heading.textContent = 'Error';
+    
+    const messageElement = document.createElement('p');
+    messageElement.textContent = message;
+    
+    // Add close button
+    const closeButton = document.createElement('button');
+    closeButton.textContent = '×';
+    closeButton.className = 'close-notification';
+    closeButton.onclick = function() {
+        notification.remove();
+    };
+    
+    // Add help text for Google Sheets errors
+    if (message.includes('Google Sheet')) {
+        const helpText = document.createElement('div');
+        helpText.className = 'help-text';
+        helpText.innerHTML = `
+            <p><strong>Troubleshooting:</strong></p>
+            <ol>
+                <li>Ensure your Google Sheet is publicly shared (Anyone with the link can view)</li>
+                <li>Verify your sheet has a column titled exactly "Full Names"</li>
+                <li>Try using a different browser or clearing your cache</li>
+            </ol>
+        `;
+        notification.appendChild(helpText);
+    }
+    
+    // Assemble and add to document
+    notification.appendChild(closeButton);
+    notification.appendChild(heading);
+    notification.appendChild(messageElement);
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 15 seconds
+    setTimeout(() => {
+        if (document.body.contains(notification)) {
+            notification.remove();
+        }
+    }, 15000);
 }

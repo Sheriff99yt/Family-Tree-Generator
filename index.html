@@ -31,11 +31,12 @@
             </div>
 
             <div class="input-container">
-                <textarea id="input" class="half-size"
-                    placeholder="John Smith + Mary Jones
+                <textarea id="input" placeholder="Enter relationships:
+John Smith + Mary Jones
+Mike John Smith
 Sarah John Smith
 
-or Use Google Sheet link"></textarea>
+or Use Google Sheet link with 'Full Names' column"></textarea>
                 <div class="controls">
                     <button class="full-width"
                         onclick="generateTree()">Generate</button>
@@ -70,6 +71,20 @@ or Use Google Sheet link"></textarea>
                     </div>
                     <div class="selected-emojis"></div>
                     <button class="save-emojis">Save</button>
+                </div>
+                <div class="google-sheets-help">
+                    <details>
+                        <summary>Using Google Sheets</summary>
+                        <div class="help-content">
+                            <p>Your Google Sheet must:</p>
+                            <ol>
+                                <li>Be publicly shared (Anyone with the link can view)</li>
+                                <li>Have a column titled exactly <code>Full Names</code></li>
+                                <li>Optional columns: <code>Birth Date</code>, <code>End Date</code>, <code>Person Picture</code></li>
+                            </ol>
+                            <p class="note">Note: If experiencing CORS issues, try opening the sheet in an incognito window first.</p>
+                        </div>
+                    </details>
                 </div>
             </div>
         </div>
